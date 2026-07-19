@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Droply — Package Delivery</title>
 <link rel="icon" type="image/png" href="droply-logo.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -240,6 +240,19 @@
   .oscenter .oscard .b{font-size:12.5px;color:#334155;margin-top:1px;line-height:1.35}
   .oscenter .osgrab{width:130px;height:5px;background:rgba(255,255,255,.45);border-radius:3px;margin:8px auto}
   .oscenter .oshint{text-align:center;color:rgba(255,255,255,.6);font-size:12px;padding:0 0 14px}
+
+  /* ===== Installed-app / real-phone mode: drop the mockup phone frame ===== */
+  @media (display-mode: standalone), (display-mode: fullscreen), (max-width: 500px) {
+    body{ padding:0; margin:0; display:block; background:var(--bg); min-height:100vh; }
+    .phone{ width:100%; height:100vh; height:100dvh; max-height:none; border:none; border-radius:0; box-shadow:none; }
+    .notch{ display:none; }
+    .statusbar{ display:none; }
+    .screen{ top:0; padding-top:env(safe-area-inset-top); }
+    .picker{ padding-top:calc(34px + env(safe-area-inset-top)); }
+    .nav{ padding-bottom:calc(8px + env(safe-area-inset-bottom)); height:calc(74px + env(safe-area-inset-bottom)); }
+    .notifpanel, .oscenter, .mapoverlay{ top:0; padding-top:env(safe-area-inset-top); }
+    .switch{ top:calc(10px + env(safe-area-inset-top)); }
+  }
 </style>
 </head>
 <body>
