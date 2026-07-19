@@ -61,6 +61,18 @@
   .toast.show{opacity:1}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+  .pill.p-role{background:#ede9fe;color:var(--violet)}
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .overlay.show{display:flex}
+  .modal{background:#fff;border-radius:16px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 30px 70px rgba(0,0,0,.35)}
+  .modal .mh{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .modal .mh h3{margin:0;font-size:17px}
+  .modal .mb{padding:20px}
+  .modal .mf{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+  .x{background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;line-height:1}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .btn.outline{background:#fff;border:1.5px solid var(--line);color:var(--ink)}
+  .you{background:var(--brand-soft);color:var(--brand-dark);font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;margin-left:6px}
 </style>
 </head>
 <body>
@@ -84,6 +96,7 @@
   <main class="main" id="main"></main>
 </div>
 
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -93,8 +106,10 @@ const esc=s=>(s==null?'':String(s)).replace(/</g,'&lt;');
 const jod=n=>(Math.round((n||0)*100)/100)+' JOD';
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
 
-let route='captains';
-let captains=[], customers=[], discounts=[], settlements=[], deliveries=[];
+let route='dashboard';
+let captains=[], customers=[], discounts=[], settlements=[], deliveries=[], staff=[];
+const CITIES=['Amman','Zarqa','Irbid','Russeifa','Aqaba','Salt','Madaba','Mafraq','Jerash','Ajloun','Karak',"Ma'an",'Tafilah','Ramtha'];
+const STAFF_ROLES={super_admin:'Super Admin',manager:'Manager',dispatcher:'Dispatcher',support:'Support',finance:'Finance'};
 
 /* ---------- AUTH ---------- */
 async function login(){
@@ -107,7 +122,7 @@ async function login(){
   if(!isAdmin){ $('l_hint').textContent='This account is not an admin.'; await sb.auth.signOut(); return; }
   $('whoami').textContent=email;
   $('login').style.display='none'; $('app').style.display='block';
-  await loadAll(); go('captains');
+  await loadAll(); go('dashboard');
 }
 async function logout(){ await sb.auth.signOut(); location.reload(); }
 
@@ -115,17 +130,18 @@ async function boot(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session) return;
   const {data:isAdmin}=await sb.rpc('is_admin');
-  if(isAdmin){ $('whoami').textContent=session.user.email; $('login').style.display='none'; $('app').style.display='block'; await loadAll(); go('captains'); }
+  if(isAdmin){ $('whoami').textContent=session.user.email; $('login').style.display='none'; $('app').style.display='block'; await loadAll(); go('dashboard'); }
 }
 
 /* ---------- DATA ---------- */
 async function loadAll(){
-  const [cap,cus,dis,set,del] = await Promise.all([
+  const [cap,cus,dis,set,del,stf] = await Promise.all([
     sb.from('captains').select('*, profiles(full_name,email,mobile,city,created_at)').order('created_at',{ascending:false}),
     sb.from('profiles').select('*').eq('role','customer').order('created_at',{ascending:false}),
     sb.from('discounts').select('*').order('id'),
     sb.from('settlements').select('*').order('created_at',{ascending:false}),
     sb.from('deliveries').select('*').order('created_at',{ascending:false}),
+    sb.from('profiles').select('*').eq('role','admin').order('created_at',{ascending:false}),
   ]);
   captains=(cap.data||[]).map(c=>({id:c.id, name:c.profiles?.full_name||'—', email:c.profiles?.email||'',
     mobile:c.profiles?.mobile||'', city:c.profiles?.city||'', vehicle:c.vehicle, plate:c.plate,
@@ -134,6 +150,7 @@ async function loadAll(){
   discounts=(dis.data||[]);
   settlements=(set.data||[]);
   deliveries=(del.data||[]);
+  staff=(stf.data||[]);
 }
 
 /* ---------- NAV ---------- */
@@ -141,16 +158,35 @@ function go(r){route=r;render();}
 function render(){
   const pend=captains.filter(c=>c.status==='pending').length;
   const pendS=settlements.filter(s=>s.status==='pending').length;
-  const items=[['captains','🚗','Captains',pend],['customers','🙂','Customers'],['deliveries','📦','Deliveries'],
-    ['discounts','🏷️','Discounts'],['settlements','🏦','Settlements',pendS],['announce','📢','Announcements']];
+  const items=[['dashboard','▤','Dashboard'],['captains','🚗','Captains',pend],['customers','🙂','Customers'],['deliveries','📦','Deliveries'],
+    ['discounts','🏷️','Discounts'],['settlements','🏦','Settlements',pendS],['announce','📢','Announcements'],['team','👥','Team']];
   $('nav').innerHTML=items.map(([r,i,l,b])=>`<a class="${route===r?'on':''}" onclick="go('${r}')">${i} ${l}${b?`<span class="badge">${b}</span>`:''}</a>`).join('');
   const m=$('main');
-  if(route==='captains') m.innerHTML=viewCaptains();
+  if(route==='dashboard') m.innerHTML=viewDashboard();
+  else if(route==='captains') m.innerHTML=viewCaptains();
   else if(route==='customers') m.innerHTML=viewCustomers();
   else if(route==='deliveries') m.innerHTML=viewDeliveries();
   else if(route==='discounts') m.innerHTML=viewDiscounts();
   else if(route==='settlements') m.innerHTML=viewSettlements();
   else if(route==='announce') m.innerHTML=viewAnnounce();
+  else if(route==='team') m.innerHTML=viewTeam();
+}
+function viewDashboard(){
+  const kpi=(l,v,d)=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${d?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${d}</div>`:''}</div>`;
+  const rev=deliveries.filter(d=>d.status==='delivered').reduce((s,d)=>s+Number(d.price||0),0);
+  return `<div class="head"><div><h1>Dashboard</h1><div class="sub">Overview of your operations</div></div>
+    <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
+    <div class="kpis">
+      ${kpi('🚗 Captains',captains.length,captains.filter(c=>c.status==='verified').length+' verified')}
+      ${kpi('⏳ Pending approvals',captains.filter(c=>c.status==='pending').length,'Awaiting review')}
+      ${kpi('🙂 Customers',customers.length,'Registered')}
+      ${kpi('📦 Deliveries',deliveries.length,deliveries.filter(d=>d.status==='delivered').length+' delivered')}
+    </div>
+    <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+      ${kpi('💰 Revenue',jod(rev),'From completed deliveries')}
+      ${kpi('🏦 Pending settlements',settlements.filter(s=>s.status==='pending').length,'To review')}
+      ${kpi('👥 Team members',staff.length,'Admins & staff')}
+    </div>`;
 }
 
 /* ---------- CAPTAINS ---------- */
@@ -164,9 +200,10 @@ function viewCaptains(){
       ${c.status==='pending'?`<button class="mini g" onclick="setCaptain('${c.id}','verified')">Approve</button><button class="mini r" onclick="setCaptain('${c.id}','suspended')">Reject</button>`:''}
       ${c.status==='verified'?`<button class="mini r" onclick="setCaptain('${c.id}','suspended')">Suspend</button>`:''}
       ${c.status==='suspended'?`<button class="mini g" onclick="setCaptain('${c.id}','verified')">Reinstate</button>`:''}
+      <button class="mini b" onclick="openCaptain('${c.id}')">Edit</button>
     </td></tr>`).join('') || `<tr><td class="empty" colspan="7">No captains yet. When someone signs up as a captain in the app, they appear here.</td></tr>`;
   return `<div class="head"><div><h1>Captains</h1><div class="sub">${captains.length} registered · ${captains.filter(c=>c.status==='pending').length} awaiting approval</div></div>
-    <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
+    <div style="display:flex;gap:8px"><button class="btn sm outline" onclick="reload()">↻ Refresh</button><button class="btn sm" onclick="openNewCaptain()">＋ Add captain</button></div></div>
     <div class="panel"><table><thead><tr><th>Captain</th><th>Mobile</th><th>City</th><th>Vehicle</th><th>Status</th><th>Owed</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 async function setCaptain(id,status){
@@ -180,11 +217,12 @@ function viewCustomers(){
   const rows=customers.map(c=>`<tr>
     <td><div class="u"><div class="nm">${esc(c.full_name)}</div><div class="em">${esc(c.email)}</div></div></td>
     <td>${esc(c.mobile||'—')}</td><td>${esc(c.city||'—')}</td>
-    <td>${new Date(c.created_at).toISOString().slice(0,10)}</td></tr>`).join('')
-    || `<tr><td class="empty" colspan="4">No customers yet.</td></tr>`;
+    <td>${new Date(c.created_at).toISOString().slice(0,10)}</td>
+    <td><button class="mini b" onclick="openCustomer('${c.id}')">Edit</button></td></tr>`).join('')
+    || `<tr><td class="empty" colspan="5">No customers yet.</td></tr>`;
   return `<div class="head"><div><h1>Customers</h1><div class="sub">${customers.length} registered</div></div>
     <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
-    <div class="panel"><table><thead><tr><th>Customer</th><th>Mobile</th><th>City</th><th>Joined</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="panel"><table><thead><tr><th>Customer</th><th>Mobile</th><th>City</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ---------- DELIVERIES ---------- */
@@ -269,6 +307,118 @@ async function sendAnnounce(){
   if(error){toast(error.message);return;}
   $('an_title').value='';$('an_msg').value='';
   toast('Sent to '+(data||0)+' user'+(data===1?'':'s'));
+}
+
+/* ---------- MODALS ---------- */
+function openModal(html){ $('modal').innerHTML=html; $('overlay').classList.add('show'); }
+function closeModal(){ $('overlay').classList.remove('show'); }
+$('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
+function fieldRow(id,label,val,type){return `<label>${label}</label><input id="${id}" type="${type||'text'}" value="${esc(val||'')}">`;}
+function citySelect(id,val){return `<label>City</label><select id="${id}">${CITIES.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</select>`;}
+
+/* ---------- EDIT CAPTAIN ---------- */
+function openCaptain(id){
+  const c=captains.find(x=>x.id===id); if(!c)return;
+  const parts=(c.name||'').split(' '); const fn=parts.shift()||''; const ln=parts.join(' ');
+  openModal(`<div class="mh"><h3>Edit captain</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb">
+      <div class="two"><div>${fieldRow('e_fn','First name',fn)}</div><div>${fieldRow('e_ln','Last name',ln)}</div></div>
+      ${fieldRow('e_mobile','Mobile',c.mobile)}
+      <div class="two"><div>${citySelect('e_city',c.city)}</div>
+        <div><label>Vehicle</label><select id="e_veh"><option ${c.vehicle==='Car'?'selected':''}>Car</option><option ${c.vehicle==='Motorcycle'?'selected':''}>Motorcycle</option></select></div></div>
+      <div class="two"><div>${fieldRow('e_plate','Plate',c.plate)}</div>
+        <div><label>Status</label><select id="e_status">${['pending','verified','suspended'].map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join('')}</select></div></div>
+    </div>
+    <div class="mf"><button class="btn outline" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCaptain('${id}')">Save</button></div>`);
+}
+async function saveCaptain(id){
+  const name=($('e_fn').value+' '+$('e_ln').value).trim();
+  const {error:e1}=await sb.from('profiles').update({full_name:name,mobile:$('e_mobile').value.trim(),city:$('e_city').value}).eq('id',id);
+  const {error:e2}=await sb.from('captains').update({vehicle:$('e_veh').value,plate:$('e_plate').value.trim(),status:$('e_status').value}).eq('id',id);
+  if(e1||e2){toast((e1||e2).message);return;}
+  closeModal(); await loadAll(); render(); toast('Captain updated');
+}
+
+/* ---------- EDIT CUSTOMER ---------- */
+function openCustomer(id){
+  const c=customers.find(x=>x.id===id); if(!c)return;
+  openModal(`<div class="mh"><h3>Edit customer</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb">${fieldRow('e_name','Full name',c.full_name)}${fieldRow('e_mobile','Mobile',c.mobile)}${citySelect('e_city',c.city)}</div>
+    <div class="mf"><button class="btn outline" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCustomer('${id}')">Save</button></div>`);
+}
+async function saveCustomer(id){
+  const {error}=await sb.from('profiles').update({full_name:$('e_name').value.trim(),mobile:$('e_mobile').value.trim(),city:$('e_city').value}).eq('id',id);
+  if(error){toast(error.message);return;}
+  closeModal(); await loadAll(); render(); toast('Customer updated');
+}
+
+/* ---------- ADD CAPTAIN (via edge function) ---------- */
+function openNewCaptain(){
+  openModal(`<div class="mh"><h3>Add captain</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb">
+      ${fieldRow('n_name','Full name','')}
+      <div class="two"><div>${fieldRow('n_email','Email','','email')}</div><div>${fieldRow('n_mobile','Mobile','')}</div></div>
+      <div class="two"><div>${citySelect('n_city','Amman')}</div>
+        <div><label>Vehicle</label><select id="n_veh"><option>Car</option><option>Motorcycle</option></select></div></div>
+      <div class="two"><div>${fieldRow('n_plate','Plate','')}</div><div>${fieldRow('n_pass','Temp password','','password')}</div></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:10px">Creates a verified captain login. Requires the admin-create-user function to be deployed.</div>
+    </div>
+    <div class="mf"><button class="btn outline" onclick="closeModal()">Cancel</button><button class="btn" onclick="addCaptain()">Create captain</button></div>`);
+}
+async function addCaptain(){
+  const body={role:'captain',full_name:$('n_name').value.trim(),email:$('n_email').value.trim(),password:$('n_pass').value,
+    mobile:$('n_mobile').value.trim(),city:$('n_city').value,vehicle:$('n_veh').value,plate:$('n_plate').value.trim()};
+  if(!body.full_name||!body.email||!body.password){toast('Fill name, email and password');return;}
+  await createUser(body,'Captain added');
+}
+
+/* ---------- TEAM ---------- */
+function viewTeam(){
+  const meEmail=$('whoami').textContent;
+  const rows=staff.map(s=>`<tr>
+    <td><div class="u"><div class="nm">${esc(s.full_name)}${s.email===meEmail?'<span class="you">You</span>':''}</div><div class="em">${esc(s.email)}</div></div></td>
+    <td><span class="pill p-role">${STAFF_ROLES[s.staff_role]||'Admin'}</span></td>
+    <td>${s.created_at?new Date(s.created_at).toISOString().slice(0,10):'—'}</td>
+    <td><button class="mini b" onclick="openStaff('${s.id}')">Edit role</button></td></tr>`).join('')
+    || `<tr><td class="empty" colspan="4">No team members.</td></tr>`;
+  const roleCards=Object.entries(STAFF_ROLES).map(([k,v])=>`<div class="kpi"><div class="l">🔑 ${v}</div></div>`).join('');
+  return `<div class="head"><div><h1>Team</h1><div class="sub">${staff.length} admin/staff members</div></div>
+    <div style="display:flex;gap:8px"><button class="btn sm outline" onclick="reload()">↻ Refresh</button><button class="btn sm" onclick="openNewStaff()">＋ Add member</button></div></div>
+    <div class="panel" style="margin-bottom:18px"><table><thead><tr><th>Member</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function openStaff(id){
+  const s=staff.find(x=>x.id===id); if(!s)return;
+  openModal(`<div class="mh"><h3>Edit ${esc(s.full_name)}</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb"><label>Role</label><select id="s_role">${Object.entries(STAFF_ROLES).map(([k,v])=>`<option value="${k}" ${s.staff_role===k?'selected':''}>${v}</option>`).join('')}</select></div>
+    <div class="mf"><button class="btn outline" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveStaff('${id}')">Save</button></div>`);
+}
+async function saveStaff(id){
+  const {error}=await sb.from('profiles').update({staff_role:$('s_role').value}).eq('id',id);
+  if(error){toast(error.message);return;}
+  closeModal(); await loadAll(); render(); toast('Role updated');
+}
+function openNewStaff(){
+  openModal(`<div class="mh"><h3>Add team member</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb">
+      ${fieldRow('t_name','Full name','')}
+      <div class="two"><div>${fieldRow('t_email','Email','','email')}</div><div>${fieldRow('t_pass','Temp password','','password')}</div></div>
+      <label>Role</label><select id="t_role">${Object.entries(STAFF_ROLES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
+      <div style="font-size:12px;color:var(--muted);margin-top:10px">Creates a staff login with admin access. Requires the admin-create-user function to be deployed.</div>
+    </div>
+    <div class="mf"><button class="btn outline" onclick="closeModal()">Cancel</button><button class="btn" onclick="addStaff()">Create member</button></div>`);
+}
+async function addStaff(){
+  const body={role:'admin',full_name:$('t_name').value.trim(),email:$('t_email').value.trim(),password:$('t_pass').value,staff_role:$('t_role').value};
+  if(!body.full_name||!body.email||!body.password){toast('Fill name, email and password');return;}
+  await createUser(body,'Team member added');
+}
+
+async function createUser(body,okMsg){
+  toast('Creating…');
+  const {data,error}=await sb.functions.invoke('admin-create-user',{body});
+  if(error){ toast('Failed — is the admin-create-user function deployed?'); return; }
+  if(data&&data.error){ toast(data.error); return; }
+  closeModal(); await loadAll(); render(); toast(okMsg);
 }
 
 async function reload(){ await loadAll(); render(); toast('Refreshed'); }
