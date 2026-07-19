@@ -335,29 +335,46 @@ const COMMISSION=0.5;                 // Droply's cut of each delivery fee (50%)
 function priceFor(fromCity,toCity){ return fromCity===toCity?PRICE_SAME:PRICE_CROSS; }
 function round2(n){ return Math.round(n*100)/100; }
 function jod(n){ n=Math.round(n*100)/100; return n+' JOD'; }
-/* discount codes (would be synced from admin/backend in production) */
-const DISCOUNTS=[
-  {code:'WELCOME10',type:'percent',value:10,active:true},
-  {code:'SAVE1',type:'fixed',value:1,active:true},
-  {code:'HALFOFF',type:'percent',value:50,active:true},
-  {code:'EXPIRED',type:'percent',value:20,active:false},
-];
+/* discount codes (loaded from Supabase) */
+let DISCOUNTS=[];
 function findDiscount(code){return DISCOUNTS.find(d=>d.code===(code||'').trim().toUpperCase()&&d.active);}
 function applyDisc(base,d){ if(!d)return base;
   return d.type==='percent'?Math.max(0,base*(1-d.value/100)):Math.max(0,base-d.value); }
 function discLabel(d){return d.type==='percent'?d.value+'% off':jod(d.value)+' off';}
 
-let deliveries=[
-  {id:1,owner:'demo@droply.app',fromCity:'Amman',toCity:'Amman',from:'Sunrise Cafe, 5th Ave, Amman',pickCoords:'31.95200, 35.91000',size:'small',notes:'Leave at front desk',status:'pending',driver:null,basePrice:3,discountCode:null,price:3,
-    bags:[{recipient:'Dana K.',addr:'42 Maple Street, Apt 3B, Amman',mobile:'+962 7 7742 0091'}]},
-  {id:2,owner:'other@droply.app',fromCity:'Amman',toCity:'Zarqa',from:'TechHub Store, Market Sq, Amman',pickCoords:'31.98300, 35.93400',size:'medium',notes:'Fragile — monitor',status:'pending',driver:null,basePrice:6,discountCode:null,price:6,
-    bags:[{recipient:'Omar B.',addr:'88 River Road, Zarqa',mobile:'+962 7 9903 5560'}]},
-  {id:3,owner:'other@droply.app',fromCity:'Irbid',toCity:'Irbid',from:'Bloom Florist, Oak Ln, Irbid',pickCoords:'32.55560, 35.85000',size:'medium',notes:'Same building, 3 flats',status:'pending',driver:null,basePrice:9,discountCode:null,price:9,
-    bags:[{recipient:'Lena M.',addr:'12 Hill Crest Blvd, Irbid',mobile:'+962 7 8123 7788'},
-          {recipient:'Sara T.',addr:'14 Hill Crest Blvd, Irbid',mobile:'+962 7 8123 4410'},
-          {recipient:'Nour A.',addr:'16 Hill Crest Blvd, Irbid',mobile:'+962 7 8123 9922'}]},
-];
-let nextId=4;
+let deliveries=[];   // loaded from Supabase
+function coordStr(la,lo){ return (la!=null&&lo!=null)?`${la}, ${lo}`:''; }
+function mapDelivery(r){
+  const cap=r.captains;
+  return { id:r.id, owner:r.customer_id, fromCity:r.from_city, toCity:r.to_city,
+    from:r.pickup_addr||'', pickCoords:coordStr(r.pickup_lat,r.pickup_lng),
+    size:r.size, notes:r.notes||'', status:r.status, paymentMethod:r.payment_method||'cod',
+    basePrice:Number(r.base_price||0), price:Number(r.price||0), discountCode:r.discount_code,
+    captainId:r.captain_id,
+    driver: r.captain_id ? {email:r.captain_id, name:(cap&&cap.profiles)?cap.profiles.full_name:'Captain', vehicle:cap?cap.vehicle:'', plate:cap?cap.plate:''} : null,
+    bags:(r.delivery_bags||[]).slice().sort((a,b)=>(a.seq||0)-(b.seq||0)).map(b=>({recipient:b.recipient,addr:b.address,mobile:b.mobile})) };
+}
+const DELSEL='*, delivery_bags(*), captains(vehicle,plate,profiles(full_name))';
+async function loadDeliveries(){
+  try{
+    let rows=[];
+    if(role==='customer'&&customerUser){
+      const {data}=await sb.from('deliveries').select(DELSEL).eq('customer_id',customerUser.id).order('created_at',{ascending:false});
+      rows=data||[];
+    } else if(role==='driver'&&driver){
+      const {data:mine}=await sb.from('deliveries').select(DELSEL).eq('captain_id',driver.id).order('created_at',{ascending:false});
+      const {data:pend}=await sb.from('deliveries').select(DELSEL).eq('status','pending').order('created_at',{ascending:false});
+      const seen=new Set(); rows=[];
+      [...(mine||[]),...(pend||[])].forEach(r=>{ if(!seen.has(r.id)){seen.add(r.id); rows.push(r);} });
+    }
+    deliveries=rows.map(mapDelivery);
+  }catch(e){ console.error('loadDeliveries',e); }
+}
+async function loadDiscounts(){
+  try{ const {data}=await sb.from('discounts').select('*').eq('active',true);
+    if(data) DISCOUNTS=data.map(d=>({code:d.code,type:d.type,value:Number(d.value),active:d.active})); }catch(_){}
+}
+async function refreshAndRender(){ await loadDeliveries(); render(); }
 let draft={fromCity:'Amman',pickAddr:'',pickCoords:'',toCity:'Amman',multi:false,bags:[{recipient:'',addr:'',mobile:''}],size:'medium',notes:'',code:'',discountObj:null,paymentMethod:'cod'};
 
 /* ---------------- HELPERS ---------------- */
@@ -455,7 +472,8 @@ function resetDocs(){ docs={id:null,license:null,record:null}; }
 function backToPicker(){ show('picker'); }
 async function logout(){ if(notifChannel){sb.removeChannel(notifChannel);notifChannel=null;} await sb.auth.signOut();
   driver=null; customerUser=null; role=null; verifyEmail=null; notifications=[]; show('picker'); }
-function enterApp(){ tab='home'; screen='main'; resetDocs(); show('app'); render(); loadNotifications(); pushOnEnter(); }
+function enterApp(){ tab='home'; screen='main'; resetDocs(); show('app'); render(); loadNotifications(); pushOnEnter();
+  loadDiscounts(); refreshAndRender(); }
 
 function renderAuth(){
   const v=$('authView');
@@ -612,7 +630,11 @@ async function loadProfileAndRoute(){
   }
 }
 
-function go(t){tab=t;screen='main';selected=null;render();}
+function go(t){tab=t;screen='main';selected=null;render();
+  if(role==='driver'){ refreshAndRender(); if(t==='earn'){ loadTransfers().then(render); refreshCaptainBalance().then(render); } }
+  else if(role==='customer'){ refreshAndRender(); }
+}
+async function refreshCaptainBalance(){ if(!driver)return; try{const {data}=await sb.from('captains').select('earnings,owed').eq('id',driver.id).single(); if(data){driver.earnings=Number(data.earnings||0);driver.owed=Number(data.owed||0);}}catch(_){}}
 function openItem(id,scr){selected=id;screen=scr;render();}
 function back(){screen='main';selected=null;render();}
 
@@ -633,7 +655,7 @@ function renderCustomer(){
   if(screen==='track') return custTrack();
   return custHome();
 }
-function myDeliveries(){return deliveries.filter(d=>d.owner===customerUser.email);}
+function myDeliveries(){return deliveries.filter(d=>d.owner===customerUser.id);}
 function custHome(){
   const mine=myDeliveries();
   const active=mine.filter(d=>d.status!=='delivered'&&d.status!=='cancelled'), done=mine.filter(d=>d.status==='delivered'||d.status==='cancelled');
@@ -783,20 +805,30 @@ function custCreate(){
     <button class="btn" onclick="submitDelivery()">Post delivery · ${jod(final)}</button>
     <div style="height:12px"></div>`;
 }
-function submitDelivery(){
+async function submitDelivery(){
   if(!draft.pickCoords){toast('Tap “Use my current location” to set pickup');return;}
   for(let i=0;i<draft.bags.length;i++){const b=draft.bags[i];
     if(!b.recipient.trim()||!b.addr.trim()||!b.mobile.trim()){toast('Fill in all details for bag '+(i+1));return;}}
+  const [plat,plng]=(draft.pickCoords||'').split(',').map(s=>parseFloat(s));
   const from='📍 Current location ('+draft.pickCoords+'), '+draft.fromCity;
-  const bags=draft.bags.map(b=>({recipient:b.recipient.trim(),addr:b.addr.trim()+', '+draft.toCity,mobile:b.mobile.trim()}));
-  const base=priceFor(draft.fromCity,draft.toCity)*bags.length;
+  const base=priceFor(draft.fromCity,draft.toCity)*draft.bags.length;
   const disc=draft.discountObj;
-  const d={id:nextId++,owner:customerUser.email,fromCity:draft.fromCity,toCity:draft.toCity,from,pickCoords:draft.pickCoords,
-    bags,size:draft.size,notes:draft.notes.trim(),status:'pending',driver:null,paymentMethod:draft.paymentMethod,
-    basePrice:base,discountCode:disc?disc.code:null,price:applyDisc(base,disc)};
-  deliveries.unshift(d);
-  notify('captain',null,'📦','New delivery available',`${bags.length} drop-off${bags.length>1?'s':''} in ${draft.toCity} · ${jod(d.price)}`);
-  screen='track';selected=d.id;tab='home';render();toast('Delivery posted — finding a captain');
+  const price=applyDisc(base,disc);
+  toast('Posting…');
+  try{
+    const {data:del,error}=await sb.from('deliveries').insert({
+      customer_id:customerUser.id, from_city:draft.fromCity, to_city:draft.toCity, pickup_addr:from,
+      pickup_lat:isNaN(plat)?null:plat, pickup_lng:isNaN(plng)?null:plng,
+      size:draft.size, notes:draft.notes.trim(), payment_method:draft.paymentMethod,
+      status:'pending', base_price:base, price, discount_code:disc?disc.code:null }).select().single();
+    if(error){toast(error.message);return;}
+    const rows=draft.bags.map((b,i)=>{const m=(b.addr||'').match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/);
+      return {delivery_id:del.id,seq:i+1,recipient:b.recipient.trim(),address:b.addr.trim()+', '+draft.toCity,mobile:b.mobile.trim(),
+        lat:m?parseFloat(m[1]):null,lng:m?parseFloat(m[2]):null};});
+    await sb.from('delivery_bags').insert(rows);
+    await loadDeliveries();
+    screen='track';selected=del.id;tab='home';render();toast('Delivery posted — finding a captain');
+  }catch(e){toast('Could not post: '+(e.message||e));}
 }
 function custTrack(){
   const d=deliveries.find(x=>x.id===selected); if(!d)return custHome();
@@ -844,13 +876,12 @@ function custTrack(){
   }
   return h;
 }
-function cancelDelivery(id){
+async function cancelDelivery(id){
   const d=deliveries.find(x=>x.id===id); if(!d||!(d.status==='pending'||d.status==='assigned'))return;
   if(!confirm('Cancel this delivery?'+(d.status==='assigned'?'\n\nA captain has already accepted — they’ll be notified.':'')))return;
-  const capEmail=d.driver&&d.driver.email;
-  d.status='cancelled'; d.driver=null; d.track=null; stopTracking();
-  if(capEmail) notify('captain',capEmail,'🚫','Delivery cancelled',`The customer cancelled job #${d.id}.`);
-  render(); toast('Delivery cancelled');
+  stopTracking();
+  await sb.from('deliveries').update({status:'cancelled',captain_id:null}).eq('id',id);
+  await loadDeliveries(); render(); toast('Delivery cancelled');
 }
 
 /* ===== DRIVER ===== */
@@ -999,36 +1030,37 @@ function driverJob(){
   }
   return h;
 }
-function claim(id){
+async function claim(id){
   const d=deliveries.find(x=>x.id===id); if(!d||d.status!=='pending')return;
   if(myActiveJob()){toast('Finish your current delivery first');return;}
-  d.driver={name:driver.name,email:driver.email,vehicle:driver.vehicle,plate:driver.plate}; d.status='assigned';
-  notify('customer',d.owner,'🧑‍✈️','Captain assigned',`${driver.name} accepted your delivery and is heading to the pickup.`);
+  const {error}=await sb.from('deliveries').update({captain_id:driver.id,status:'assigned'}).eq('id',id);
+  if(error){toast(error.message);return;}
+  await loadDeliveries();
   selected=id;screen='jobDetail';render();toast('Job claimed! Head to pickup.');
 }
-function cancelClaim(id){
+async function cancelClaim(id){
   const d=deliveries.find(x=>x.id===id); if(!d||d.status!=='assigned')return;
   if(!confirm('Cancel this claim?\n\nThe job will be released back to other captains.'))return;
-  d.driver=null; d.status='pending'; d.track=null;
-  notify('customer',d.owner,'⚠️','Captain cancelled','Your captain cancelled — we’re finding another captain for you.');
-  notify('captain',null,'📦','Delivery available again',`${bagCount(d)} drop-off${bagCount(d)>1?'s':''} in ${d.toCity} · ${jod(d.price)}`);
+  await sb.from('deliveries').update({captain_id:null,status:'pending'}).eq('id',id);
+  await loadDeliveries();
   screen='main';tab='home';selected=null;render();toast('Claim cancelled — job is open again');
 }
-function advance(id){
+async function advance(id){
   const d=deliveries.find(x=>x.id===id); if(!d)return;
-  if(d.status==='assigned'){d.status='transit';
-    notify('customer',d.owner,'📦','Package picked up','Your package is on the way to the drop-off.');
-    toast('Pickup confirmed — in transit');}
-  else if(d.status==='transit'){
-    d.status='delivered';
+  if(d.status==='assigned'){
+    await sb.from('deliveries').update({status:'transit'}).eq('id',id);
+    await loadDeliveries(); render(); toast('Pickup confirmed — in transit');
+  } else if(d.status==='transit'){
     const comm=round2(d.price*COMMISSION), net=round2(d.price-comm);
-    d.commission=comm; d.captainNet=net;
-    driver.earnings=round2((driver.earnings||0)+net);
-    if((d.paymentMethod||'cod')==='cod') driver.owed=round2((driver.owed||0)+comm);
-    notify('customer',d.owner,'✅','Delivered','Your delivery is complete. Thanks for using Droply!');
-    toast('Delivered! You earned '+jod(net));
+    await sb.from('deliveries').update({status:'delivered'}).eq('id',id);
+    // update captain balance
+    const {data:cap}=await sb.from('captains').select('earnings,owed').eq('id',driver.id).single();
+    const upd={earnings:round2(Number(cap.earnings||0)+net)};
+    if((d.paymentMethod||'cod')==='cod') upd.owed=round2(Number(cap.owed||0)+comm);
+    await sb.from('captains').update(upd).eq('id',driver.id);
+    driver.earnings=upd.earnings; if(upd.owed!=null) driver.owed=upd.owed;
+    await loadDeliveries(); render(); toast('Delivered! You earned '+jod(net));
   }
-  render();
 }
 function openSettle(){ settleDraft={amount:String(driver.owed||''),proof:null,ref:''}; screen='settle'; render(); }
 function onProof(input){ const f=input.files&&input.files[0]; if(!f)return; settleDraft.proof=f.name; render(); }
@@ -1051,14 +1083,18 @@ function settleForm(){
     <div style="height:18px"></div>
     <button class="btn" onclick="submitTransfer()">Submit for review</button>`;
 }
-function submitTransfer(){
+async function submitTransfer(){
   const amt=parseFloat(settleDraft.amount);
   if(!(amt>0)){toast('Enter the amount you transferred');return;}
   if(!settleDraft.proof){toast('Upload your transfer receipt');return;}
-  driver.pendingTransfers=driver.pendingTransfers||[];
-  driver.pendingTransfers.unshift({amount:round2(amt),ref:settleDraft.ref.trim(),proof:settleDraft.proof,
-    date:new Date().toISOString().slice(0,10),status:'pending'});
+  await sb.from('settlements').insert({captain_id:driver.id,amount:round2(amt),reference:settleDraft.ref.trim(),status:'pending'});
+  await loadTransfers();
   screen='main'; render(); toast('Transfer submitted — under review');
+}
+async function loadTransfers(){
+  if(!driver)return;
+  const {data}=await sb.from('settlements').select('*').eq('captain_id',driver.id).order('created_at',{ascending:false});
+  driver.pendingTransfers=(data||[]).map(t=>({amount:Number(t.amount),ref:t.reference||'',proof:'receipt',date:(t.created_at||'').slice(0,10),status:t.status}));
 }
 function driverTrips(){
   const jobs=myJobs();
