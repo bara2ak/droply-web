@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Droply — Package Delivery</title>
 <link rel="icon" type="image/png" href="droply-logo.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -23,6 +23,7 @@
     --red:#dc2626; --card:#ffffff;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{touch-action:manipulation;-webkit-text-size-adjust:100%}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     background:#e2e8f0;color:var(--ink);display:flex;justify-content:center;
     align-items:center;min-height:100vh;padding:24px}
@@ -245,7 +246,8 @@
   @media (display-mode: standalone), (display-mode: fullscreen), (max-width: 500px) {
     html,body{ height:100%; overflow:hidden; overscroll-behavior:none; }
     body{ padding:0; margin:0; display:block; background:var(--bg); position:fixed; inset:0; }
-    .phone{ width:100%; height:100vh; height:100dvh; max-height:none; border:none; border-radius:0; box-shadow:none; }
+    .phone{ width:100%; height:100%; max-height:none; border:none; border-radius:0; box-shadow:none; position:absolute; inset:0; }
+    .screen{ position:absolute; inset:0; }
     .notch{ display:none; }
     .statusbar{ display:none; }
     .screen{ top:0; padding-top:env(safe-area-inset-top); }
