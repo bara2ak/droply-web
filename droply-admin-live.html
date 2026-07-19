@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Droply — Admin (Live)</title>
+<link rel="icon" type="image/png" href="droply-logo.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="droply-config.js"></script>
+<style>
+  :root{--brand:#2563eb;--brand-dark:#1d4ed8;--brand-soft:#eff4ff;--ink:#0f172a;--muted:#64748b;
+    --line:#e5e9f0;--bg:#f1f5f9;--card:#fff;--green:#16a34a;--green-soft:#e9f9ef;--amber:#d97706;
+    --amber-soft:#fdf3e7;--red:#dc2626;--red-soft:#fee2e2;--violet:#6d28d9}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+  a{cursor:pointer}
+  .login{min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(160deg,#1e3a8a,#2563eb 60%,#3b82f6);padding:20px}
+  .login .box{background:#fff;border-radius:20px;padding:36px 32px;width:370px;box-shadow:0 30px 70px rgba(0,0,0,.3)}
+  .brand{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:800;letter-spacing:-.5px}
+  .brand .dot{width:40px;height:34px;background:url('droply-logo.png') center/contain no-repeat}
+  .tag{color:var(--muted);font-size:13px;margin:2px 0 20px}
+  label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.4px}
+  input,select,textarea{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;background:#fff}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand)}
+  .btn{padding:11px 16px;border:none;border-radius:10px;font-size:14px;font-weight:700;background:var(--brand);color:#fff;cursor:pointer}
+  .btn:hover{background:var(--brand-dark)} .btn.full{width:100%;padding:13px;margin-top:20px}
+  .btn.sm{padding:7px 12px;font-size:13px;border-radius:8px}
+  .hint{font-size:12px;color:var(--muted);text-align:center;margin-top:14px}
+  .app{display:none;min-height:100vh}
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:220px;background:#0f172a;color:#cbd5e1;padding:22px 14px;display:flex;flex-direction:column}
+  .sidebar .brand{color:#fff;font-size:20px;padding:0 8px 18px}
+  .sidebar .brand .dot{width:34px;height:28px}
+  .sidebar nav a{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:10px;color:#cbd5e1;font-weight:600;margin-bottom:3px}
+  .sidebar nav a:hover{background:#1e293b;color:#fff}.sidebar nav a.on{background:var(--brand);color:#fff}
+  .sidebar nav a .badge{margin-left:auto;background:var(--amber);color:#fff;font-size:11px;font-weight:800;padding:1px 7px;border-radius:20px}
+  .sidebar .foot{margin-top:auto;border-top:1px solid #1e293b;padding-top:14px;font-size:12px;color:#94a3b8}
+  .sidebar .foot a:hover{color:#fff}
+  .main{margin-left:220px;padding:26px 30px}
+  .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  .head h1{font-size:22px;margin:0}.head .sub{color:var(--muted);font-size:13px;margin-top:3px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .ph{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:700}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;padding:11px 16px;background:#f8fafc;border-bottom:1px solid var(--line)}
+  td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:none} tr:hover{background:#f8fafc}
+  .u .nm{font-weight:700}.u .em{font-size:12px;color:var(--muted)}
+  .pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;display:inline-block}
+  .p-verified{background:var(--green-soft);color:var(--green)}
+  .p-pending{background:var(--amber-soft);color:var(--amber)}
+  .p-suspended{background:var(--red-soft);color:var(--red)}
+  .mini{font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:8px;border:1.5px solid var(--line);background:#fff;cursor:pointer;color:var(--ink);margin-right:5px}
+  .mini.g{border-color:#bbf7d0;color:var(--green)}.mini.r{border-color:#fecaca;color:var(--red)}.mini.b{border-color:#bfdbfe;color:var(--brand-dark)}
+  td select{padding:6px 9px;border-radius:8px;font-size:13px;width:auto}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+  .kpi .l{color:var(--muted);font-size:12.5px;font-weight:600}.kpi .v{font-size:26px;font-weight:800;margin-top:6px}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:12px 20px;border-radius:24px;font-size:13.5px;font-weight:600;z-index:200;opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="login" id="login">
+  <div class="box">
+    <div class="brand"><span class="dot"></span>Droply</div>
+    <div class="tag">Admin — connected to Supabase</div>
+    <label>Email</label><input id="l_email" type="email" placeholder="admin@…">
+    <label>Password</label><input id="l_pass" type="password" placeholder="••••••">
+    <button class="btn full" onclick="login()">Sign in</button>
+    <div class="hint" id="l_hint">Use the admin account you created in Supabase.</div>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>Droply</div>
+    <nav id="nav"></nav>
+    <div class="foot"><div id="whoami">admin</div><a onclick="logout()">← Sign out</a></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const sb = supabase.createClient(window.DROPLY_SUPABASE_URL, window.DROPLY_SUPABASE_ANON_KEY);
+const $=id=>document.getElementById(id);
+const esc=s=>(s==null?'':String(s)).replace(/</g,'&lt;');
+const jod=n=>(Math.round((n||0)*100)/100)+' JOD';
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
+
+let route='captains';
+let captains=[], customers=[], discounts=[], settlements=[], deliveries=[];
+
+/* ---------- AUTH ---------- */
+async function login(){
+  const email=($('l_email').value||'').trim(), pass=$('l_pass').value||'';
+  if(!email||!pass){toast('Enter email and password');return;}
+  $('l_hint').textContent='Signing in…';
+  const {error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){$('l_hint').textContent='Wrong email or password.';return;}
+  const {data:isAdmin}=await sb.rpc('is_admin');
+  if(!isAdmin){ $('l_hint').textContent='This account is not an admin.'; await sb.auth.signOut(); return; }
+  $('whoami').textContent=email;
+  $('login').style.display='none'; $('app').style.display='block';
+  await loadAll(); go('captains');
+}
+async function logout(){ await sb.auth.signOut(); location.reload(); }
+
+async function boot(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session) return;
+  const {data:isAdmin}=await sb.rpc('is_admin');
+  if(isAdmin){ $('whoami').textContent=session.user.email; $('login').style.display='none'; $('app').style.display='block'; await loadAll(); go('captains'); }
+}
+
+/* ---------- DATA ---------- */
+async function loadAll(){
+  const [cap,cus,dis,set,del] = await Promise.all([
+    sb.from('captains').select('*, profiles(full_name,email,mobile,city,created_at)').order('created_at',{ascending:false}),
+    sb.from('profiles').select('*').eq('role','customer').order('created_at',{ascending:false}),
+    sb.from('discounts').select('*').order('id'),
+    sb.from('settlements').select('*').order('created_at',{ascending:false}),
+    sb.from('deliveries').select('*').order('created_at',{ascending:false}),
+  ]);
+  captains=(cap.data||[]).map(c=>({id:c.id, name:c.profiles?.full_name||'—', email:c.profiles?.email||'',
+    mobile:c.profiles?.mobile||'', city:c.profiles?.city||'', vehicle:c.vehicle, plate:c.plate,
+    status:c.status, owed:Number(c.owed||0), earnings:Number(c.earnings||0)}));
+  customers=(cus.data||[]);
+  discounts=(dis.data||[]);
+  settlements=(set.data||[]);
+  deliveries=(del.data||[]);
+}
+
+/* ---------- NAV ---------- */
+function go(r){route=r;render();}
+function render(){
+  const pend=captains.filter(c=>c.status==='pending').length;
+  const pendS=settlements.filter(s=>s.status==='pending').length;
+  const items=[['captains','🚗','Captains',pend],['customers','🙂','Customers'],['deliveries','📦','Deliveries'],
+    ['discounts','🏷️','Discounts'],['settlements','🏦','Settlements',pendS],['announce','📢','Announcements']];
+  $('nav').innerHTML=items.map(([r,i,l,b])=>`<a class="${route===r?'on':''}" onclick="go('${r}')">${i} ${l}${b?`<span class="badge">${b}</span>`:''}</a>`).join('');
+  const m=$('main');
+  if(route==='captains') m.innerHTML=viewCaptains();
+  else if(route==='customers') m.innerHTML=viewCustomers();
+  else if(route==='deliveries') m.innerHTML=viewDeliveries();
+  else if(route==='discounts') m.innerHTML=viewDiscounts();
+  else if(route==='settlements') m.innerHTML=viewSettlements();
+  else if(route==='announce') m.innerHTML=viewAnnounce();
+}
+
+/* ---------- CAPTAINS ---------- */
+function capPill(s){return `<span class="pill p-${s}">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`;}
+function viewCaptains(){
+  const rows=captains.map(c=>`<tr>
+    <td><div class="u"><div class="nm">${esc(c.name)}</div><div class="em">${esc(c.email)}</div></div></td>
+    <td>${esc(c.mobile)}</td><td>${esc(c.city)}</td><td>${esc(c.vehicle)} · ${esc(c.plate||'—')}</td>
+    <td>${capPill(c.status)}</td><td>${c.owed>0?`<b style="color:var(--amber)">${jod(c.owed)}</b>`:'—'}</td>
+    <td>
+      ${c.status==='pending'?`<button class="mini g" onclick="setCaptain('${c.id}','verified')">Approve</button><button class="mini r" onclick="setCaptain('${c.id}','suspended')">Reject</button>`:''}
+      ${c.status==='verified'?`<button class="mini r" onclick="setCaptain('${c.id}','suspended')">Suspend</button>`:''}
+      ${c.status==='suspended'?`<button class="mini g" onclick="setCaptain('${c.id}','verified')">Reinstate</button>`:''}
+    </td></tr>`).join('') || `<tr><td class="empty" colspan="7">No captains yet. When someone signs up as a captain in the app, they appear here.</td></tr>`;
+  return `<div class="head"><div><h1>Captains</h1><div class="sub">${captains.length} registered · ${captains.filter(c=>c.status==='pending').length} awaiting approval</div></div>
+    <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
+    <div class="panel"><table><thead><tr><th>Captain</th><th>Mobile</th><th>City</th><th>Vehicle</th><th>Status</th><th>Owed</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+async function setCaptain(id,status){
+  const {error}=await sb.from('captains').update({status}).eq('id',id);
+  if(error){toast(error.message);return;}
+  await loadAll(); render(); toast('Captain '+(status==='verified'?'approved':status));
+}
+
+/* ---------- CUSTOMERS ---------- */
+function viewCustomers(){
+  const rows=customers.map(c=>`<tr>
+    <td><div class="u"><div class="nm">${esc(c.full_name)}</div><div class="em">${esc(c.email)}</div></div></td>
+    <td>${esc(c.mobile||'—')}</td><td>${esc(c.city||'—')}</td>
+    <td>${new Date(c.created_at).toISOString().slice(0,10)}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="4">No customers yet.</td></tr>`;
+  return `<div class="head"><div><h1>Customers</h1><div class="sub">${customers.length} registered</div></div>
+    <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
+    <div class="panel"><table><thead><tr><th>Customer</th><th>Mobile</th><th>City</th><th>Joined</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+/* ---------- DELIVERIES ---------- */
+function viewDeliveries(){
+  const rows=deliveries.map(d=>`<tr><td>#${d.id}</td><td>${esc(d.from_city)} → ${esc(d.to_city)}</td>
+    <td>${jod(d.price)}</td><td>${esc(d.status)}</td><td>${new Date(d.created_at).toISOString().slice(0,10)}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="5">No deliveries yet — they appear here once orders are wired to the database.</td></tr>`;
+  return `<div class="head"><div><h1>Deliveries</h1><div class="sub">${deliveries.length} total</div></div>
+    <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
+    <div class="panel"><table><thead><tr><th>ID</th><th>Route</th><th>Price</th><th>Status</th><th>Created</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+/* ---------- DISCOUNTS ---------- */
+function viewDiscounts(){
+  const rows=discounts.map(d=>`<tr>
+    <td><b style="font-family:monospace">${esc(d.code)}</b></td>
+    <td>${d.type==='percent'?d.value+'%':jod(d.value)}</td>
+    <td>${d.active?'<span class="pill p-verified">Active</span>':'<span class="pill p-suspended">Inactive</span>'}</td>
+    <td><button class="mini ${d.active?'r':'g'}" onclick="toggleDiscount(${d.id},${!d.active})">${d.active?'Deactivate':'Activate'}</button>
+      <button class="mini r" onclick="deleteDiscount(${d.id})">Delete</button></td></tr>`).join('')
+    || `<tr><td class="empty" colspan="4">No discount codes.</td></tr>`;
+  return `<div class="head"><div><h1>Discount codes</h1><div class="sub">${discounts.filter(d=>d.active).length} active</div></div></div>
+    <div class="card"><div class="two">
+      <div><label>Code</label><input id="dc_code" placeholder="SUMMER25" style="text-transform:uppercase"></div>
+      <div><label>Type</label><select id="dc_type"><option value="percent">Percentage %</option><option value="fixed">Fixed JOD</option></select></div>
+    </div>
+    <div class="two"><div><label>Value</label><input id="dc_val" type="number" min="0" placeholder="10"></div>
+      <div style="display:flex;align-items:flex-end"><button class="btn full" style="margin:0" onclick="addDiscount()">Add code</button></div></div></div>
+    <div class="panel"><table><thead><tr><th>Code</th><th>Value</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+async function addDiscount(){
+  const code=($('dc_code').value||'').trim().toUpperCase();
+  const val=parseFloat($('dc_val').value);
+  if(!code){toast('Enter a code');return;} if(!(val>0)){toast('Enter a value');return;}
+  const {error}=await sb.from('discounts').insert({code,type:$('dc_type').value,value:val,active:true});
+  if(error){toast(error.message);return;}
+  await loadAll();render();toast(code+' added');
+}
+async function toggleDiscount(id,active){ await sb.from('discounts').update({active}).eq('id',id); await loadAll();render(); }
+async function deleteDiscount(id){ if(!confirm('Delete this code?'))return; await sb.from('discounts').delete().eq('id',id); await loadAll();render();toast('Deleted'); }
+
+/* ---------- SETTLEMENTS ---------- */
+function capName(id){const c=captains.find(x=>x.id===id);return c?c.name:'—';}
+function viewSettlements(){
+  const rows=settlements.map(s=>`<tr>
+    <td>${esc(capName(s.captain_id))}</td><td><b>${jod(s.amount)}</b></td><td>${esc(s.reference||'—')}</td>
+    <td>${s.status==='pending'?'<span class="pill p-pending">Pending</span>':s.status==='approved'?'<span class="pill p-verified">Approved</span>':'<span class="pill p-suspended">Rejected</span>'}</td>
+    <td>${s.status==='pending'?`<button class="mini g" onclick="approveSettlement('${s.id}','${s.captain_id}',${s.amount})">Approve</button><button class="mini r" onclick="rejectSettlement('${s.id}')">Reject</button>`:'—'}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="5">No settlement submissions yet — they appear when captains submit transfers.</td></tr>`;
+  return `<div class="head"><div><h1>Settlements</h1><div class="sub">${settlements.filter(s=>s.status==='pending').length} pending</div></div>
+    <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
+    <div class="panel"><table><thead><tr><th>Captain</th><th>Amount</th><th>Reference</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+async function approveSettlement(id,capId,amount){
+  const cap=captains.find(c=>c.id===capId); const newOwed=Math.max(0,Math.round(((cap?cap.owed:0)-amount)*100)/100);
+  await sb.from('settlements').update({status:'approved'}).eq('id',id);
+  await sb.from('captains').update({owed:newOwed}).eq('id',capId);
+  await loadAll();render();toast('Approved — balance updated');
+}
+async function rejectSettlement(id){ if(!confirm('Reject this transfer?'))return; await sb.from('settlements').update({status:'rejected'}).eq('id',id); await loadAll();render();toast('Rejected'); }
+
+/* ---------- ANNOUNCEMENTS ---------- */
+let anAud='all';
+function viewAnnounce(){
+  return `<div class="head"><div><h1>Announcements</h1><div class="sub">Send a live notification to the app</div></div></div>
+    <div class="card" style="max-width:560px">
+      <label>Send to</label>
+      <div style="display:flex;gap:8px">
+        ${['all','customers','captains'].map(a=>`<button class="mini ${anAud===a?'b':''}" style="${anAud===a?'border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)':''}" onclick="anAud='${a}';render()">${a==='all'?'Everyone':a[0].toUpperCase()+a.slice(1)}</button>`).join('')}
+      </div>
+      <label>Title</label><input id="an_title" placeholder="e.g. Holiday hours">
+      <label>Message</label><textarea id="an_msg" rows="4" placeholder="Write your announcement…"></textarea>
+      <div style="height:14px"></div>
+      <button class="btn full" onclick="sendAnnounce()">Send announcement</button>
+      <div class="hint" style="margin-top:12px">This inserts a notification for every ${anAud==='all'?'user':anAud.slice(0,-1)} and appears in their app instantly.</div>
+    </div>`;
+}
+async function sendAnnounce(){
+  const title=($('an_title').value||'').trim(), msg=($('an_msg').value||'').trim();
+  if(!title){toast('Enter a title');return;} if(!msg){toast('Enter a message');return;}
+  const {data,error}=await sb.rpc('broadcast_announcement',{p_audience:anAud,p_title:title,p_body:msg});
+  if(error){toast(error.message);return;}
+  $('an_title').value='';$('an_msg').value='';
+  toast('Sent to '+(data||0)+' user'+(data===1?'':'s'));
+}
+
+async function reload(){ await loadAll(); render(); toast('Refreshed'); }
+boot();
+</script>
+</body>
+</html>

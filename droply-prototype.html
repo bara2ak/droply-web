@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Droply — Package Delivery</title>
+<link rel="icon" type="image/png" href="droply-logo.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2563eb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Droply">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="droply-config.js"></script>
+<style>
+  :root{
+    --brand:#2563eb; --brand-dark:#1d4ed8; --brand-soft:#eff4ff;
+    --ink:#0f172a; --muted:#64748b; --line:#e5e9f0; --bg:#f5f7fb;
+    --green:#16a34a; --green-soft:#e9f9ef; --amber:#d97706; --amber-soft:#fdf3e7;
+    --red:#dc2626; --card:#ffffff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#e2e8f0;color:var(--ink);display:flex;justify-content:center;
+    align-items:center;min-height:100vh;padding:24px}
+  .phone{width:390px;height:800px;max-height:94vh;background:var(--bg);border-radius:44px;
+    box-shadow:0 30px 70px rgba(15,23,42,.35);position:relative;overflow:hidden;
+    border:11px solid #0f172a}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:26px;
+    background:#0f172a;border-radius:0 0 18px 18px;z-index:60}
+  .statusbar{height:44px;display:flex;align-items:flex-end;justify-content:space-between;
+    padding:0 26px 4px;font-size:13px;font-weight:600;color:var(--ink)}
+  .screen{position:absolute;inset:0;top:44px;bottom:0;display:flex;flex-direction:column;overflow:hidden}
+  .body{flex:1;overflow-y:auto;padding:16px 18px 92px}
+  .body::-webkit-scrollbar{display:none}
+  .topbar{padding:6px 18px 12px;display:flex;align-items:center;justify-content:space-between}
+  .logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:20px;letter-spacing:-.5px}
+  .logo .dot{width:44px;height:40px;background:url('droply-logo.png') center/contain no-repeat;
+    color:transparent;font-size:0}
+  .role-tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+    background:var(--brand-soft);color:var(--brand-dark);padding:5px 10px;border-radius:20px}
+  h1{font-size:22px;margin:4px 0 2px;letter-spacing:-.5px}
+  h2{font-size:16px;margin:20px 0 10px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;
+    margin-bottom:12px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  .card.tap{cursor:pointer;transition:transform .08s}
+  .card.tap:active{transform:scale(.985)}
+  .row{display:flex;align-items:center;gap:10px}
+  .between{display:flex;align-items:center;justify-content:space-between}
+  .pill{font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px;white-space:nowrap}
+  .p-pending{background:var(--amber-soft);color:var(--amber)}
+  .p-assigned{background:var(--brand-soft);color:var(--brand-dark)}
+  .p-transit{background:#eef2ff;color:#4f46e5}
+  .p-done{background:var(--green-soft);color:var(--green)}
+  .p-cancel{background:#fee2e2;color:#dc2626}
+  .route{margin:12px 0 4px;padding-left:6px}
+  .stop{display:flex;gap:11px;position:relative;padding-bottom:14px}
+  .stop:last-child{padding-bottom:0}
+  .stop .ic{width:22px;display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+  .stop .ic .mark{width:11px;height:11px;border-radius:50%;border:2.5px solid var(--brand);background:#fff;z-index:2}
+  .stop.drop .ic .mark{border-color:var(--green)}
+  .stop .ic .line{position:absolute;top:12px;width:2px;height:100%;background:var(--line)}
+  .stop .txt small{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:700}
+  .stop .txt div{font-size:14px;font-weight:600;margin-top:1px}
+  .meta{display:flex;gap:16px;margin-top:6px;font-size:12px;color:var(--muted)}
+  .meta b{color:var(--ink);font-weight:700}
+  label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:14px 0 6px;
+    text-transform:uppercase;letter-spacing:.4px}
+  input,select,textarea{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;
+    font-size:15px;font-family:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand)}
+  textarea{resize:none;height:70px}
+  .seg{display:flex;gap:8px;margin-top:6px}
+  .seg .opt{flex:1;text-align:center;padding:12px 4px;border:1.5px solid var(--line);border-radius:12px;
+    font-size:13px;font-weight:600;cursor:pointer;background:#fff}
+  .seg .opt.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)}
+  .seg .opt .em{display:block;font-size:19px;margin-bottom:2px}
+  .btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:15px;font-weight:700;
+    background:var(--brand);color:#fff;cursor:pointer;transition:transform .08s}
+  .btn:active{transform:scale(.98)}
+  .btn.ghost{background:var(--brand-soft);color:var(--brand-dark)}
+  .btn.green{background:var(--green)}
+  .btn.outline{background:#fff;border:1.5px solid var(--line);color:var(--ink)}
+  .btn.danger{background:#fff;border:1.5px solid #fecaca;color:var(--red)}
+  .btn.sm{padding:11px;font-size:14px;border-radius:12px}
+  .btn:disabled{opacity:.45}
+  .nav{position:absolute;bottom:0;left:0;right:0;height:74px;background:#fff;border-top:1px solid var(--line);
+    display:flex;padding-bottom:8px;z-index:40}
+  .nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    color:var(--muted);font-size:10.5px;font-weight:600;cursor:pointer}
+  .nav a .ni{font-size:21px}
+  .nav a.on{color:var(--brand)}
+  .picker{position:absolute;inset:0;background:linear-gradient(160deg,#1e3a8a,#2563eb 55%,#3b82f6);
+    display:flex;flex-direction:column;justify-content:center;padding:34px;color:#fff;z-index:50;overflow-y:auto}
+  .picker .big{font-size:44px;font-weight:800;letter-spacing:-1.5px;display:flex;align-items:center;gap:12px}
+  .picker .big .dot{width:92px;height:86px;background:url('droply-logo.png') center/contain no-repeat;
+    color:transparent;font-size:0}
+  .picker p{opacity:.9;font-size:15px;margin:14px 0 34px;line-height:1.5}
+  .rolecard{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.25);border-radius:20px;
+    padding:20px;margin-bottom:14px;cursor:pointer;transition:background .15s}
+  .rolecard:active{background:rgba(255,255,255,.24)}
+  .rolecard .rc-t{font-size:19px;font-weight:700;display:flex;align-items:center;gap:11px}
+  .rolecard .rc-s{opacity:.85;font-size:13px;margin-top:6px;padding-left:37px}
+  .rc-em{font-size:26px}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px;font-size:14px}
+  .empty .e-em{font-size:44px;display:block;margin-bottom:12px;opacity:.5}
+  .back{background:none;border:none;font-size:15px;color:var(--brand);font-weight:700;cursor:pointer;
+    padding:6px 0;display:flex;align-items:center;gap:6px}
+  .switch{position:absolute;top:52px;right:16px;z-index:45;background:rgba(15,23,42,.06);border:none;
+    border-radius:20px;padding:6px 11px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer}
+  .banner{background:var(--brand);color:#fff;border-radius:16px;padding:16px;margin-bottom:14px}
+  .banner .bt{font-size:13px;opacity:.85}
+  .banner .bv{font-size:26px;font-weight:800;margin-top:2px}
+  .toast{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;
+    padding:11px 18px;border-radius:24px;font-size:13px;font-weight:600;z-index:70;opacity:0;
+    pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+  .stat{display:flex;gap:10px}
+  .stat .box{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px;text-align:center}
+  .stat .box .v{font-size:20px;font-weight:800}
+  .stat .box .l{font-size:11px;color:var(--muted);margin-top:2px}
+  .map{height:150px;border-radius:16px;margin-bottom:14px;position:relative;overflow:hidden;
+    background:linear-gradient(90deg,#dfe6f0 1px,transparent 1px) 0 0/34px 34px,
+      linear-gradient(0deg,#dfe6f0 1px,transparent 1px) 0 0/34px 34px,#eef2f8;border:1px solid var(--line)}
+  .map .pin{position:absolute;font-size:22px}
+  .map .pinA{top:24px;left:30px}
+  .map .pinB{bottom:22px;right:34px}
+  .map .path{position:absolute;top:44px;left:44px;width:250px;height:74px;
+    border-bottom:3px dashed var(--brand);border-right:3px dashed var(--brand);border-radius:0 0 60px 0;opacity:.5}
+  .map .truck{position:absolute;top:78px;left:150px;font-size:20px}
+  /* auth */
+  .auth{padding:24px 22px}
+  .auth .hero{text-align:center;margin:20px 0 8px}
+  .auth .hero .dot{display:inline-block;width:116px;height:108px;
+    background:url('droply-logo.png') center/contain no-repeat;color:transparent;font-size:0}
+  .auth h1{text-align:center;font-size:24px;margin:14px 0 4px}
+  .auth .sub{text-align:center}
+  .tabs{display:flex;background:#eef2f8;border-radius:12px;padding:4px;margin:6px 0 4px}
+  .tabs button{flex:1;border:none;background:none;padding:10px;border-radius:9px;font-weight:700;
+    font-size:14px;color:var(--muted);cursor:pointer}
+  .tabs button.on{background:#fff;color:var(--brand-dark);box-shadow:0 1px 3px rgba(15,23,42,.1)}
+  .demo{text-align:center;font-size:12px;color:var(--muted);margin-top:14px}
+  .demo a{color:var(--brand);font-weight:700;cursor:pointer;text-decoration:underline}
+  .avatar{width:64px;height:64px;border-radius:50%;background:var(--brand-soft);display:flex;
+    align-items:center;justify-content:center;font-size:30px;margin:0 auto 10px}
+  .prof-row{display:flex;justify-content:space-between;padding:13px 2px;border-bottom:1px solid var(--line);font-size:14px}
+  .prof-row:last-child{border-bottom:none}
+  .prof-row span{color:var(--muted)}
+  /* uploads */
+  .two{display:flex;gap:10px}
+  .two>div{flex:1}
+  .upl{display:flex;align-items:center;gap:12px;border:1.5px dashed var(--line);border-radius:12px;
+    padding:13px 14px;cursor:pointer;margin-top:8px;transition:border-color .15s,background .15s}
+  .upl:active{background:#f8fafc}
+  .upl.done{border-style:solid;border-color:var(--green);background:var(--green-soft)}
+  .upl .upl-ic{font-size:22px;flex-shrink:0}
+  .upl .upl-txt{flex:1;min-width:0}
+  .upl .upl-t{display:block;font-size:13px;font-weight:700}
+  .upl .upl-status{display:block;font-size:11.5px;color:var(--muted);margin-top:1px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .upl.done .upl-status{color:var(--green);font-weight:700}
+  .upl .chev{color:var(--muted);font-size:16px}
+  .note{background:var(--brand-soft);border-radius:12px;padding:12px 14px;font-size:12.5px;
+    color:var(--brand-dark);margin:14px 0;line-height:1.45}
+  .vbadge{display:inline-flex;align-items:center;gap:5px;background:var(--green-soft);color:var(--green);
+    font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px}
+  .checklist{list-style:none;padding:0;margin:12px 0}
+  .checklist li{display:flex;gap:10px;align-items:center;padding:9px 0;font-size:14px;border-bottom:1px solid var(--line)}
+  .checklist li:last-child{border-bottom:none}
+  .checklist .ck{color:var(--green);font-size:17px}
+  /* profile picture */
+  .pfp{position:relative;width:88px;height:88px;margin:0 auto 12px}
+  .pfp .img{width:88px;height:88px;border-radius:50%;background:var(--brand-soft);display:flex;
+    align-items:center;justify-content:center;font-size:40px;overflow:hidden;background-size:cover;background-position:center}
+  .pfp .cam{position:absolute;bottom:0;right:0;width:30px;height:30px;border-radius:50%;background:var(--brand);
+    color:#fff;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
+  /* bag stepper + bag cards */
+  .stepper{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;width:fit-content;margin-top:6px}
+  .stepper button{width:48px;height:48px;border:none;background:#fff;font-size:22px;font-weight:700;color:var(--brand);cursor:pointer}
+  .stepper button:disabled{color:var(--line)}
+  .stepper .qv{width:56px;text-align:center;font-size:18px;font-weight:800}
+  .bagcard{border:1.5px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px;background:#fbfcfe}
+  .bagcard .bh{font-size:12px;font-weight:800;color:var(--brand-dark);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+  .bagcard label{margin:8px 0 4px}
+  .bagcard input{padding:11px 12px;font-size:14px}
+  /* map picker */
+  .mapoverlay{position:absolute;inset:0;z-index:80;background:#fff;display:none;flex-direction:column}
+  .mapoverlay.show{display:flex}
+  .maphead{padding:14px 16px;font-weight:700;font-size:15px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between}
+  .maphead a{color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
+  .mapwrap{flex:1;position:relative}
+  #pickmap{position:absolute;inset:0}
+  .mappin{position:absolute;top:50%;left:50%;transform:translate(-50%,-100%);font-size:36px;
+    z-index:500;pointer-events:none;filter:drop-shadow(0 3px 3px rgba(0,0,0,.35))}
+  .mapfoot{padding:13px 16px;border-top:1px solid var(--line)}
+  .mapfoot .co{font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px}
+  /* notifications */
+  .bell{position:relative;background:rgba(15,23,42,.05);border:none;width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .ndot{position:absolute;top:5px;right:5px;min-width:16px;height:16px;padding:0 3px;background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:9px;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
+  .ndot.show{display:flex}
+  .notifpanel{position:absolute;inset:0;top:44px;z-index:75;background:var(--bg);display:none;flex-direction:column}
+  .notifpanel.show{display:flex}
+  .notifhead{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);font-weight:800;font-size:17px;background:#fff}
+  .notifhead a{color:var(--muted);font-size:24px;cursor:pointer;line-height:1}
+  .notiflist{flex:1;overflow-y:auto;padding:12px 16px}
+  .nitem{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px;display:flex;gap:11px}
+  .nitem.unread{border-color:var(--brand);background:var(--brand-soft)}
+  .nitem .nic{font-size:22px;flex-shrink:0}
+  .nitem .ntitle{font-weight:700;font-size:14px}
+  .nitem .nbody{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.4}
+  .nitem .ntime{font-size:11px;color:var(--muted);margin-top:5px}
+  /* on-screen push banner */
+  .push{position:absolute;top:8px;left:10px;right:10px;z-index:90;background:#fff;border:1px solid var(--line);
+    border-radius:18px;box-shadow:0 12px 32px rgba(15,23,42,.25);padding:11px 13px;display:flex;gap:11px;align-items:center;
+    transform:translateY(-160%);opacity:0;transition:transform .38s cubic-bezier(.2,.85,.25,1),opacity .3s;cursor:pointer}
+  .push.show{transform:translateY(0);opacity:1}
+  .push .push-ic{font-size:24px;flex-shrink:0}
+  .push .push-t{font-weight:800;font-size:13px}
+  .push .push-b{font-size:12px;color:var(--muted);margin-top:1px;line-height:1.35;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .push .push-app{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+  /* phone notification center (lock-screen shade) */
+  .statusbar{cursor:pointer}
+  .oscenter{position:absolute;inset:0;z-index:95;background:linear-gradient(180deg,#0f172a,#1e293b);
+    display:none;flex-direction:column;transform:translateY(-100%);transition:transform .4s cubic-bezier(.2,.85,.25,1)}
+  .oscenter.show{display:flex;transform:translateY(0)}
+  .oscenter .osclock{text-align:center;color:#fff;padding:40px 0 16px}
+  .oscenter .osclock .t{font-size:54px;font-weight:300;letter-spacing:1px}
+  .oscenter .osclock .d{font-size:14px;opacity:.8;margin-top:2px}
+  .oscenter .oslist{flex:1;overflow-y:auto;padding:6px 12px 12px}
+  .oscenter .oscard{background:rgba(255,255,255,.94);border-radius:16px;padding:11px 13px;margin-bottom:9px;display:flex;gap:10px;align-items:flex-start}
+  .oscenter .oscard .ic{font-size:22px;flex-shrink:0}
+  .oscenter .oscard .head{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  .oscenter .oscard .t{font-weight:700;font-size:13.5px;margin-top:1px}
+  .oscenter .oscard .b{font-size:12.5px;color:#334155;margin-top:1px;line-height:1.35}
+  .oscenter .osgrab{width:130px;height:5px;background:rgba(255,255,255,.45);border-radius:3px;margin:8px auto}
+  .oscenter .oshint{text-align:center;color:rgba(255,255,255,.6);font-size:12px;padding:0 0 14px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+  <div class="statusbar" onclick="openOSCenter()"><span>9:41</span><span>􀙇 􀖀 100%</span></div>
+
+  <!-- ROLE PICKER -->
+  <div class="picker" id="picker">
+    <div class="big"><span class="dot">▸</span>Droply</div>
+    <p>Send anything, anywhere. Post a delivery and a nearby captain picks it up.</p>
+    <div class="rolecard" onclick="chooseRole('customer')">
+      <div class="rc-t"><span class="rc-em">📦</span> I want to send a package</div>
+      <div class="rc-s">Create a delivery and track it in real time</div>
+    </div>
+    <div class="rolecard" onclick="chooseRole('driver')">
+      <div class="rc-t"><span class="rc-em">🚗</span> I'm a captain</div>
+      <div class="rc-s">Browse nearby jobs and earn on your schedule</div>
+    </div>
+  </div>
+
+  <!-- AUTH SCREEN -->
+  <div class="screen" id="authScreen" style="display:none">
+    <button class="switch" onclick="backToPicker()">↺ Change role</button>
+    <div class="body auth" id="authView"></div>
+  </div>
+
+  <!-- APP SCREEN -->
+  <div class="screen" id="app" style="display:none">
+    <div class="topbar">
+      <div class="logo"><span class="dot">▸</span>Droply</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="bell" onclick="openNotifs()">🔔<span class="ndot" id="nDot">0</span></button>
+        <span class="role-tag" id="roleTag">Customer</span>
+      </div>
+    </div>
+    <div class="body" id="view"></div>
+    <div class="nav" id="nav"></div>
+  </div>
+
+  <!-- NOTIFICATIONS -->
+  <div class="notifpanel" id="notifPanel">
+    <div class="notifhead"><span>Notifications</span><a onclick="closeNotifs()">×</a></div>
+    <div class="notiflist" id="notifList"></div>
+  </div>
+
+  <!-- MAP PICKER -->
+  <div class="mapoverlay" id="mapOverlay">
+    <div class="maphead"><span id="mapTitle">Set pickup location</span><a onclick="closeMap()">×</a></div>
+    <div class="mapwrap">
+      <div id="pickmap"></div>
+      <div class="mappin">📍</div>
+    </div>
+    <div class="mapfoot">
+      <div class="co">Move the map so the pin marks your pickup · <span id="mapCoords">—</span></div>
+      <button class="btn" onclick="confirmMap()">Confirm this location</button>
+    </div>
+  </div>
+
+  <!-- PHONE NOTIFICATION CENTER -->
+  <div class="oscenter" id="osCenter" onclick="if(event.target.id==='osCenter')closeOSCenter()">
+    <div class="osclock"><div class="t">9:41</div><div class="d">Notification Center</div></div>
+    <div class="oslist" id="osList"></div>
+    <div class="osgrab" onclick="closeOSCenter()"></div>
+    <div class="oshint">Tap to close</div>
+  </div>
+
+  <div class="push" id="push"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ---------------- SUPABASE ---------------- */
+const sb = supabase.createClient(window.DROPLY_SUPABASE_URL, window.DROPLY_SUPABASE_ANON_KEY);
+
+/* ---------------- STATE ---------------- */
+let role=null, tab='home', screen='main', selected=null, authMode='login';
+let customerUser=null;   // {id,name,email,mobile,city,photo}
+let driver=null;         // {id,name,email,mobile,city,vehicle,plate,earnings,owed,verified,status}
+let docs={id:null,license:null,record:null};  // uploaded document filenames
+let verifyEmail=null;    // captain awaiting verification
+let settleDraft={amount:'',proof:null,ref:''};  // captain transfer submission
+
+function mapCustomer(p){return {id:p.id,name:p.full_name,email:p.email,mobile:p.mobile,city:p.city,photo:p.photo_url};}
+function mapCaptain(p,c){return {id:p.id,name:p.full_name,email:p.email,mobile:p.mobile,city:p.city,photo:p.photo_url,
+  vehicle:c?c.vehicle:'Car',plate:c?c.plate:null,verified:c?c.status==='verified':false,
+  status:c?c.status:'pending',earnings:c?Number(c.earnings||0):0,owed:c?Number(c.owed||0):0,pendingTransfers:[]};}
+
+const SIZES={ small:{label:'Small',em:'📦',scale:15}, medium:{label:'Medium',em:'📦',scale:30} };
+const JO_CITIES=['Amman','Zarqa','Irbid','Russeifa','Aqaba','Salt','Madaba','Mafraq','Jerash','Ajloun','Karak',"Ma'an",'Tafilah','Ramtha'];
+const PRICE_SAME=3, PRICE_CROSS=6;   // JOD
+const COMMISSION=0.5;                 // Droply's cut of each delivery fee (50%)
+function priceFor(fromCity,toCity){ return fromCity===toCity?PRICE_SAME:PRICE_CROSS; }
+function round2(n){ return Math.round(n*100)/100; }
+function jod(n){ n=Math.round(n*100)/100; return n+' JOD'; }
+/* discount codes (would be synced from admin/backend in production) */
+const DISCOUNTS=[
+  {code:'WELCOME10',type:'percent',value:10,active:true},
+  {code:'SAVE1',type:'fixed',value:1,active:true},
+  {code:'HALFOFF',type:'percent',value:50,active:true},
+  {code:'EXPIRED',type:'percent',value:20,active:false},
+];
+function findDiscount(code){return DISCOUNTS.find(d=>d.code===(code||'').trim().toUpperCase()&&d.active);}
+function applyDisc(base,d){ if(!d)return base;
+  return d.type==='percent'?Math.max(0,base*(1-d.value/100)):Math.max(0,base-d.value); }
+function discLabel(d){return d.type==='percent'?d.value+'% off':jod(d.value)+' off';}
+
+let deliveries=[
+  {id:1,owner:'demo@droply.app',fromCity:'Amman',toCity:'Amman',from:'Sunrise Cafe, 5th Ave, Amman',pickCoords:'31.95200, 35.91000',size:'small',notes:'Leave at front desk',status:'pending',driver:null,basePrice:3,discountCode:null,price:3,
+    bags:[{recipient:'Dana K.',addr:'42 Maple Street, Apt 3B, Amman',mobile:'+962 7 7742 0091'}]},
+  {id:2,owner:'other@droply.app',fromCity:'Amman',toCity:'Zarqa',from:'TechHub Store, Market Sq, Amman',pickCoords:'31.98300, 35.93400',size:'medium',notes:'Fragile — monitor',status:'pending',driver:null,basePrice:6,discountCode:null,price:6,
+    bags:[{recipient:'Omar B.',addr:'88 River Road, Zarqa',mobile:'+962 7 9903 5560'}]},
+  {id:3,owner:'other@droply.app',fromCity:'Irbid',toCity:'Irbid',from:'Bloom Florist, Oak Ln, Irbid',pickCoords:'32.55560, 35.85000',size:'medium',notes:'Same building, 3 flats',status:'pending',driver:null,basePrice:9,discountCode:null,price:9,
+    bags:[{recipient:'Lena M.',addr:'12 Hill Crest Blvd, Irbid',mobile:'+962 7 8123 7788'},
+          {recipient:'Sara T.',addr:'14 Hill Crest Blvd, Irbid',mobile:'+962 7 8123 4410'},
+          {recipient:'Nour A.',addr:'16 Hill Crest Blvd, Irbid',mobile:'+962 7 8123 9922'}]},
+];
+let nextId=4;
+let draft={fromCity:'Amman',pickAddr:'',pickCoords:'',toCity:'Amman',multi:false,bags:[{recipient:'',addr:'',mobile:''}],size:'medium',notes:'',code:'',discountObj:null,paymentMethod:'cod'};
+
+/* ---------------- HELPERS ---------------- */
+const $=id=>document.getElementById(id);
+const esc=s=>(s||'').replace(/</g,'&lt;');
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);}
+/* ---- notifications (backed by Supabase) ---- */
+let notifId=1;
+let notifications=[];
+let notifChannel=null;
+function dbNotif(r){ return {id:r.id, icon:r.icon||'🔔', title:r.title, body:r.body||'', read:r.read,
+  t:new Date(r.created_at).getTime(), nrole:role, email:currentUser()&&currentUser().email}; }
+async function loadNotifications(){
+  notifications=[];
+  const uid=currentUser()&&currentUser().id; if(!uid){updateBell();return;}
+  const {data}=await sb.from('notifications').select().eq('user_id',uid).order('created_at',{ascending:false}).limit(50);
+  if(data) notifications=data.map(dbNotif);
+  subscribeNotifications(uid);
+  updateBell();
+}
+function subscribeNotifications(uid){
+  if(notifChannel){ sb.removeChannel(notifChannel); notifChannel=null; }
+  notifChannel=sb.channel('notif-'+uid)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+uid},
+      payload=>{ const n=dbNotif(payload.new); notifications.unshift(n); updateBell(); showPush(n); })
+    .subscribe();
+}
+// Local, in-session notifications (for events that aren't in the DB yet).
+function notify(nrole,email,icon,title,body){
+  const n={id:'l'+(notifId++),nrole,email,icon,title,body,t:Date.now(),read:false};
+  notifications.unshift(n);
+  updateBell();
+  if(isForCurrentUser(n)) showPush(n);
+}
+function isForCurrentUser(n){
+  if(role==='customer'&&customerUser) return n.nrole==='customer'&&(n.email==null||n.email===customerUser.email);
+  if(role==='driver'&&driver) return n.nrole==='captain'&&(n.email==null||n.email===driver.email);
+  return false;
+}
+function showPush(n){
+  const el=$('push'); if(!el)return;
+  el.innerHTML=`<div class="push-ic">${n.icon}</div>
+    <div style="flex:1;min-width:0"><div class="push-app">▸ Droply</div>
+      <div class="push-t">${esc(n.title)}</div><div class="push-b">${esc(n.body)}</div></div>`;
+  el.classList.add('show');
+  el.onclick=()=>{ el.classList.remove('show'); openNotifs(); };
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),4800);
+}
+function pushOnEnter(){ const n=myNotifs().find(x=>!x.read); if(n) setTimeout(()=>showPush(n),700); }
+function openOSCenter(){
+  const list=myNotifs();
+  $('osList').innerHTML = list.length ? list.map(n=>`
+    <div class="oscard"><div class="ic">${n.icon}</div>
+      <div style="flex:1;min-width:0"><div class="head"><span>▸ Droply</span><span>${relTime(n.t)}</span></div>
+      <div class="t">${esc(n.title)}</div><div class="b">${esc(n.body)}</div></div></div>`).join('')
+    : `<div style="text-align:center;color:rgba(255,255,255,.55);padding:50px 20px">No notifications</div>`;
+  $('osCenter').classList.add('show');
+}
+function closeOSCenter(){ $('osCenter').classList.remove('show'); }
+function myNotifs(){
+  if(role==='customer'&&customerUser) return notifications.filter(n=>n.nrole==='customer'&&(n.email==null||n.email===customerUser.email));
+  if(role==='driver'&&driver) return notifications.filter(n=>n.nrole==='captain'&&(n.email==null||n.email===driver.email));
+  return [];
+}
+function unreadCount(){ return myNotifs().filter(n=>!n.read).length; }
+function updateBell(){ const el=$('nDot'); if(!el)return; const c=unreadCount(); el.textContent=c>9?'9+':c; el.classList.toggle('show',c>0); }
+function relTime(ts){ const s=(Date.now()-ts)/1000; if(s<60)return 'just now'; const m=Math.floor(s/60); if(m<60)return m+'m ago'; const h=Math.floor(m/60); if(h<24)return h+'h ago'; return Math.floor(h/24)+'d ago'; }
+function renderNotifsList(){
+  const list=myNotifs(), el=$('notifList');
+  el.innerHTML = list.length ? list.map(n=>`<div class="nitem ${n.read?'':'unread'}">
+      <div class="nic">${n.icon}</div>
+      <div style="flex:1"><div class="ntitle">${esc(n.title)}</div><div class="nbody">${esc(n.body)}</div><div class="ntime">${relTime(n.t)}</div></div></div>`).join('')
+    : `<div style="padding:56px 20px;text-align:center;color:var(--muted)"><div style="font-size:42px;opacity:.5">🔔</div><div style="margin-top:8px">No notifications yet</div></div>`;
+}
+function openNotifs(){ myNotifs().forEach(n=>n.read=true); renderNotifsList(); $('notifPanel').classList.add('show'); updateBell();
+  const uid=currentUser()&&currentUser().id;
+  if(uid) sb.from('notifications').update({read:true}).eq('user_id',uid).eq('read',false); }
+function closeNotifs(){ $('notifPanel').classList.remove('show'); }
+
+const STATUS={pending:{label:'Looking for captain',cls:'p-pending'},assigned:{label:'Captain assigned',cls:'p-assigned'},
+  transit:{label:'In transit',cls:'p-transit'},delivered:{label:'Delivered',cls:'p-done'},cancelled:{label:'Cancelled',cls:'p-cancel'}};
+function pill(s){const x=STATUS[s];return `<span class="pill ${x.cls}">${x.label}</span>`;}
+function currentUser(){return role==='driver'?driver:customerUser;}
+
+/* ---------------- ROLE / AUTH FLOW ---------------- */
+function show(el){['picker','authScreen','app'].forEach(i=>$(i).style.display='none');
+  $(el).style.display = el==='picker'?'flex':'flex';}
+function chooseRole(r){
+  role=r; tab='home'; screen='main'; authMode='login'; verifyEmail=null; resetDocs();
+  const loggedIn = r==='driver'?driver:customerUser;
+  if(loggedIn){ show('app'); render(); pushOnEnter(); } else { show('authScreen'); renderAuth(); }
+}
+function resetDocs(){ docs={id:null,license:null,record:null}; }
+function backToPicker(){ show('picker'); }
+async function logout(){ if(notifChannel){sb.removeChannel(notifChannel);notifChannel=null;} await sb.auth.signOut();
+  driver=null; customerUser=null; role=null; verifyEmail=null; notifications=[]; show('picker'); }
+function enterApp(){ tab='home'; screen='main'; resetDocs(); show('app'); render(); loadNotifications(); pushOnEnter(); }
+
+function renderAuth(){
+  const v=$('authView');
+  if(verifyEmail){ v.innerHTML=verifyScreen(); return; }
+  const isDriver=role==='driver';
+  const su=authMode==='signup';
+  const head=`
+    <div class="hero"><span class="dot">▸</span></div>
+    <h1>${su?'Create your account':'Welcome back'}</h1>
+    <p class="sub">${isDriver?'Captain account':'Customer account'} · Droply</p>
+    <div class="tabs">
+      <button class="${!su?'on':''}" onclick="authMode='login';resetDocs();renderAuth()">Log in</button>
+      <button class="${su?'on':''}" onclick="authMode='signup';resetDocs();renderAuth()">Sign up</button>
+    </div>`;
+  if(su && isDriver){ v.innerHTML=head+driverSignupForm(); return; }
+  v.innerHTML=head+`
+    ${su?`<label>Full name</label><input id="a_name" placeholder="Your name">
+    <label>Mobile number</label><input id="a_mobile" type="tel" placeholder="+962 7 0000 0000">
+    <label>City</label><select id="a_city">${JO_CITIES.map(c=>`<option>${c}</option>`).join('')}</select>`:''}
+    <label>Email</label><input id="a_email" type="email" placeholder="you@email.com">
+    <label>Password</label><input id="a_pass" type="password" placeholder="••••••">
+    <div style="height:18px"></div>
+    <button class="btn" onclick="submitAuth()">${su?'Create account':'Log in'}</button>
+    <div class="demo">${su?'Already have an account? ':'New to Droply? '}
+      <a onclick="authMode='${su?'login':'signup'}';resetDocs();renderAuth()">${su?'Log in':'Create one'}</a></div>`;
+}
+function uplTile(key,ic,title,accept){
+  const done=!!docs[key];
+  return `<label class="upl ${done?'done':''}" id="tile_${key}" for="doc_${key}">
+      <span class="upl-ic">${ic}</span>
+      <span class="upl-txt"><span class="upl-t">${title}</span>
+        <span class="upl-status">${done?'✓ '+esc(docs[key]):'Tap to upload'}</span></span>
+      <span class="chev">›</span></label>
+    <input type="file" id="doc_${key}" accept="${accept}" hidden onchange="markUpload('${key}',this)">`;
+}
+function driverSignupForm(){
+  return `
+    <div class="two"><div><label>First name</label><input id="a_first" placeholder="First"></div>
+      <div><label>Last name</label><input id="a_last" placeholder="Last"></div></div>
+    <label>Mobile number</label><input id="a_mobile" type="tel" placeholder="+962 7 0000 0000">
+    <label>Email</label><input id="a_email" type="email" placeholder="you@email.com">
+    <label>Password</label><input id="a_pass" type="password" placeholder="••••••">
+    <label>City</label>
+    <select id="a_city"><option value="" disabled selected>Select your city</option>
+      ${JO_CITIES.map(c=>`<option>${c}</option>`).join('')}</select>
+    <label>Vehicle</label>
+    <select id="a_veh"><option selected>Car</option><option>Motorcycle</option></select>
+    <label>License plate</label><input id="a_plate" placeholder="e.g. ABC-1234">
+    <label>Verification documents</label>
+    ${uplTile('id','🪪','Government ID','image/*')}
+    ${uplTile('license','🚗','Driving license','image/*')}
+    ${uplTile('record','📄','Proof of no criminal record','image/*,application/pdf')}
+    <div class="note">🔒 Your documents are used only to verify your identity and are reviewed before your account is approved. In production this takes 24–48 hours.</div>
+    <button class="btn" onclick="submitAuth()">Submit for verification</button>
+    <div class="demo">Already have an account? <a onclick="authMode='login';resetDocs();renderAuth()">Log in</a></div>`;
+}
+function markUpload(key,input){
+  const f=input.files&&input.files[0]; if(!f)return;
+  docs[key]=f.name;
+  const tile=document.getElementById('tile_'+key);
+  if(tile){tile.classList.add('done');
+    tile.querySelector('.upl-status').textContent='✓ '+f.name;}
+}
+function verifyScreen(){
+  return `<div class="hero"><span class="dot">▸</span></div>
+    <h1 style="text-align:center">Verification in review</h1>
+    <p class="sub" style="text-align:center">Thanks — we've received your documents.</p>
+    <div class="card">
+      <div class="between" style="margin-bottom:6px"><b>Submitted</b><span class="vbadge">⏳ Pending review</span></div>
+      <ul class="checklist">
+        <li><span class="ck">✓</span> Government ID</li>
+        <li><span class="ck">✓</span> Driving license</li>
+        <li><span class="ck">✓</span> Criminal-record clearance</li>
+        <li><span class="ck">✓</span> Contact details</li>
+      </ul></div>
+    <div class="note">Our team reviews new captains and approves you from the admin panel. You can't claim jobs until then.</div>
+    <button class="btn" onclick="checkApproval()">I've been approved — continue →</button>
+    <div class="demo"><a onclick="verifyBack()">Back to log in</a></div>`;
+}
+async function checkApproval(){
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user){toast('Please log in again');verifyBack();return;}
+  const {data:cap}=await sb.from('captains').select('status').eq('id',user.id).single();
+  if(cap && cap.status==='verified'){ verifyEmail=null; await loadProfileAndRoute(); toast('You are verified — welcome aboard!'); }
+  else toast('Still under review — an admin will approve you soon.');
+}
+async function verifyBack(){ await sb.auth.signOut(); verifyEmail=null; authMode='login'; renderAuth(); }
+async function submitAuth(){
+  const isDriver=role==='driver';
+  const su=authMode==='signup';
+  const email=($('a_email').value||'').trim().toLowerCase();
+  const pass=$('a_pass').value||'';
+  try{
+    // ----- Captain sign-up -----
+    if(su && isDriver){
+      const first=($('a_first').value||'').trim(), last=($('a_last').value||'').trim();
+      const mobile=($('a_mobile').value||'').trim();
+      const city=$('a_city').value;
+      if(!first||!last){toast('Enter your first and last name');return;}
+      if(!mobile){toast('Enter your mobile number');return;}
+      if(!email||!pass){toast('Enter email and password');return;}
+      if(!city){toast('Select your city');return;}
+      if(!docs.id||!docs.license||!docs.record){toast('Upload all three documents');return;}
+      toast('Creating your account…');
+      const {data,error}=await sb.auth.signUp({email,password:pass});
+      if(error){toast(error.message);return;}
+      const uid=data.user.id;
+      await sb.from('profiles').insert({id:uid,role:'captain',full_name:first+' '+last,email,mobile,city});
+      await sb.from('captains').insert({id:uid,vehicle:$('a_veh').value,plate:($('a_plate').value||'').trim()||null,
+        status:'pending',id_doc_url:docs.id,license_url:docs.license,record_url:docs.record});
+      verifyEmail=email; renderAuth();
+      return;
+    }
+    if(!email||!pass){toast('Enter email and password');return;}
+    // ----- Customer sign-up -----
+    if(su){
+      const name=($('a_name').value||'').trim();
+      const mobile=($('a_mobile').value||'').trim();
+      const city=$('a_city').value;
+      if(!name){toast('Enter your name');return;}
+      if(!mobile){toast('Enter your mobile number');return;}
+      toast('Creating your account…');
+      const {data,error}=await sb.auth.signUp({email,password:pass});
+      if(error){toast(error.message);return;}
+      await sb.from('profiles').insert({id:data.user.id,role:'customer',full_name:name,email,mobile,city});
+      await loadProfileAndRoute();
+      toast('Welcome to Droply, '+name.split(' ')[0]+'!');
+    }
+    // ----- Log in (either role) -----
+    else {
+      toast('Signing in…');
+      const {error}=await sb.auth.signInWithPassword({email,password:pass});
+      if(error){toast('Wrong email or password');return;}
+      await loadProfileAndRoute();
+    }
+  }catch(err){ toast('Something went wrong: '+(err.message||err)); }
+}
+
+async function loadProfileAndRoute(){
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user){ show('picker'); return; }
+  const {data:prof,error}=await sb.from('profiles').select().eq('id',user.id).single();
+  if(error||!prof){ toast('Could not load your profile'); return; }
+  if(prof.role==='captain'){
+    role='driver';
+    const {data:cap}=await sb.from('captains').select().eq('id',user.id).single();
+    driver=mapCaptain(prof,cap); customerUser=null;
+    if(!cap || cap.status!=='verified'){ verifyEmail=prof.email; show('authScreen'); renderAuth(); return; }
+    enterApp();
+  } else {
+    role='customer';
+    customerUser=mapCustomer(prof); driver=null;
+    enterApp();
+  }
+}
+
+function go(t){tab=t;screen='main';selected=null;render();}
+function openItem(id,scr){selected=id;screen=scr;render();}
+function back(){screen='main';selected=null;render();}
+
+/* ---------------- RENDER ---------------- */
+function render(){
+  $('roleTag').textContent = role==='driver'?'Captain':'Customer';
+  const v=$('view');
+  v.innerHTML = role==='customer'?renderCustomer():renderDriver();
+  renderNav(); v.scrollTop=0; updateBell();
+  if(role==='customer'&&screen==='track') setTimeout(()=>setupTracking(selected),60);
+  else stopTracking();
+}
+
+/* ===== CUSTOMER ===== */
+function renderCustomer(){
+  if(tab==='profile') return screen==='settings'?editProfile():profile();
+  if(screen==='create'||tab==='new') return custCreate();
+  if(screen==='track') return custTrack();
+  return custHome();
+}
+function myDeliveries(){return deliveries.filter(d=>d.owner===customerUser.email);}
+function custHome(){
+  const mine=myDeliveries();
+  const active=mine.filter(d=>d.status!=='delivered'&&d.status!=='cancelled'), done=mine.filter(d=>d.status==='delivered'||d.status==='cancelled');
+  let h=`<h1>Your deliveries</h1><p class="sub">Hi ${esc(customerUser.name.split(' ')[0])} — track packages you've sent</p>`;
+  h+=`<div class="card tap" onclick="startCreate()" style="border-style:dashed;border-color:var(--brand);color:var(--brand-dark);text-align:center;font-weight:700">＋ New delivery</div>`;
+  if(!mine.length) return h+emptyState('📭','No deliveries yet','Tap “New delivery” to send your first package.');
+  if(active.length){h+=`<h2>Active</h2>`;active.forEach(d=>h+=deliveryCard(d,'track'));}
+  if(done.length){h+=`<h2>Completed</h2>`;done.forEach(d=>h+=deliveryCard(d,'track'));}
+  return h;
+}
+function bagCount(d){return (d.bags||[]).length||1;}
+function deliveryCard(d,action){
+  const n=bagCount(d);
+  return `<div class="card tap" onclick="openItem(${d.id},'${action}')">
+    <div class="between"><b>#${d.id} · ${n} bag${n>1?'s':''}</b>${pill(d.status)}</div>
+    ${routeMini(d)}
+    <div class="meta"><span>${SIZES[d.size].em} <b>${SIZES[d.size].label}</b></span>
+      <span><b>${jod(d.price)}</b>${d.discountCode?` <small style="color:var(--green);font-weight:700">🏷️${esc(d.discountCode)}</small>`:''}</span><span><b>${d.fromCity===d.toCity?'Same city':'Cross-city'}</b></span></div></div>`;
+}
+function routeMini(d){
+  const drops=d.bags||[];
+  return `<div class="route">
+    <div class="stop"><div class="ic"><span class="mark"></span><span class="line"></span></div>
+      <div class="txt"><small>Pickup</small><div>${esc(d.from)}</div></div></div>
+    ${drops.map((b,i)=>`<div class="stop drop"><div class="ic"><span class="mark"></span>${i<drops.length-1?'<span class="line"></span>':''}</div>
+      <div class="txt"><small>${drops.length>1?'Drop '+(i+1)+' · ':'Dropoff · '}${esc(b.recipient||'Recipient')}</small><div>${esc(b.addr)}</div></div></div>`).join('')}</div>`;
+}
+function startCreate(){const c=customerUser.city||'Amman';draft={fromCity:c,pickAddr:'',pickCoords:'',toCity:c,multi:false,bags:[{recipient:'',addr:'',mobile:''}],size:'medium',notes:'',code:'',discountObj:null,paymentMethod:'cod'};screen='create';tab='home';render();}
+function locateMe(){
+  if(!navigator.geolocation){toast('Location not supported on this device');return;}
+  toast('Locating you…');
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ draft.pickAddr='Current location';
+      draft.pickCoords=pos.coords.latitude.toFixed(5)+', '+pos.coords.longitude.toFixed(5);
+      if(screen==='create') render(); toast('📍 Pickup location detected'); },
+    err=>{ toast(err.code===1?'Location permission denied':'Couldn’t get your location'); },
+    {enableHighAccuracy:true,timeout:9000,maximumAge:0}
+  );
+}
+let pickMap=null, mapTarget='pickup';
+function chooseOnMap(target){
+  mapTarget = (target===undefined?'pickup':target);
+  document.getElementById('mapTitle').textContent = mapTarget==='pickup'?'Set pickup location':'Set drop-off location';
+  document.getElementById('mapOverlay').classList.add('show');
+  let start=[31.9539,35.9106]; // Amman default
+  if(mapTarget==='pickup'){ if(draft.pickCoords) start=draft.pickCoords.split(',').map(parseFloat); }
+  else { const m=(draft.bags[mapTarget].addr||'').match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/); if(m) start=[parseFloat(m[1]),parseFloat(m[2])]; }
+  setTimeout(()=>{
+    if(typeof L==='undefined'){toast('Map failed to load — check your connection');closeMap();return;}
+    if(!pickMap){
+      pickMap=L.map('pickmap',{zoomControl:true,attributionControl:false}).setView(start,15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(pickMap);
+      pickMap.on('move',updateMapCoords);
+    } else { pickMap.setView(start,15); }
+    pickMap.invalidateSize(); updateMapCoords();
+  },80);
+}
+function updateMapCoords(){ if(!pickMap)return; const c=pickMap.getCenter();
+  document.getElementById('mapCoords').textContent=c.lat.toFixed(5)+', '+c.lng.toFixed(5); }
+function confirmMap(){ const c=pickMap.getCenter(); const coords=c.lat.toFixed(5)+', '+c.lng.toFixed(5);
+  if(mapTarget==='pickup'){ draft.pickAddr='Pinned on map'; draft.pickCoords=coords; }
+  else { draft.bags[mapTarget].addr='Pinned on map ('+coords+')'; }
+  closeMap(); render(); toast('📍 Location set from map'); }
+function closeMap(){ document.getElementById('mapOverlay').classList.remove('show'); }
+function toggleMulti(){ draft.multi=!draft.multi; if(!draft.multi) draft.bags=[draft.bags[0]]; render(); }
+function addAddress(){ if(draft.bags.length<10) draft.bags.push({recipient:'',addr:'',mobile:''}); render(); }
+function removeAddress(i){ if(draft.bags.length>1) draft.bags.splice(i,1); render(); }
+function applyCode(){
+  const disc=findDiscount(draft.code);
+  if(!disc){draft.discountObj=null;toast('Invalid or inactive code');}
+  else{draft.discountObj=disc;toast(disc.code+' applied — '+discLabel(disc));}
+  render();
+}
+function cityOpts(sel){return JO_CITIES.map(c=>`<option ${sel===c?'selected':''}>${c}</option>`).join('');}
+function custCreate(){
+  const perBag=priceFor(draft.fromCity,draft.toCity);
+  const qty=draft.bags.length;
+  const same=draft.fromCity===draft.toCity;
+  const disc=draft.discountObj;
+  const base=perBag*qty;
+  const final=applyDisc(base,disc);
+  const multi=draft.multi;
+  const bagFields=draft.bags.map((b,i)=>`
+    <div class="bagcard">
+      <div class="bh">📍 ${multi?'Address '+(i+1):'Recipient'}${multi&&draft.bags.length>1?`<a onclick="removeAddress(${i})" style="margin-left:auto;color:var(--red);cursor:pointer;font-size:15px">✕ Remove</a>`:''}</div>
+      <label>Recipient name</label>
+      <input placeholder="Who's receiving it?" value="${esc(b.recipient)}" oninput="draft.bags[${i}].recipient=this.value">
+      <label>Drop-off location</label>
+      ${b.addr?`<div style="display:flex;align-items:center;gap:9px;border:1.5px solid var(--brand);border-radius:12px;padding:11px 12px;margin-top:6px">
+          <span style="font-size:18px">📍</span>
+          <div style="flex:1;font-size:13px">${esc(b.addr)}</div>
+          <a onclick="chooseOnMap(${i})" style="color:var(--brand);font-weight:700;cursor:pointer;font-size:12.5px">Change</a></div>`
+        :`<button class="btn ghost sm" style="width:auto;margin-top:6px;padding:10px 14px" onclick="chooseOnMap(${i})">🗺️ Choose on map</button>`}
+      <label>Recipient mobile</label>
+      <input type="tel" placeholder="+962 7 0000 0000" value="${esc(b.mobile)}" oninput="draft.bags[${i}].mobile=this.value">
+    </div>`).join('');
+  return `<button class="back" onclick="back()">‹ Back</button>
+    <h1>New delivery</h1><p class="sub">One pickup, one captain — send to one or many people.</p>
+    <label>Pickup city</label>
+    <select onchange="draft.fromCity=this.value;render()">${cityOpts(draft.fromCity)}</select>
+    <label>Pickup location</label>
+    ${draft.pickCoords?`<div class="card" style="display:flex;align-items:center;gap:11px;margin:6px 0 0;border-color:var(--brand)">
+        <span style="font-size:22px">📍</span>
+        <div style="flex:1"><b style="font-size:14px">${draft.pickAddr==='Pinned on map'?'Pinned on map':'Current location detected'}</b>
+          <div style="font-size:12px;color:var(--muted)">${esc(draft.pickCoords)}</div></div></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn ghost sm" style="flex:1;width:auto" onclick="locateMe()">📍 Use GPS</button>
+        <button class="btn ghost sm" style="flex:1;width:auto" onclick="chooseOnMap()">🗺️ Choose on map</button></div>`
+      :`<div style="display:flex;gap:8px">
+        <button class="btn ghost sm" style="flex:1;width:auto" onclick="locateMe()">📍 Current location</button>
+        <button class="btn ghost sm" style="flex:1;width:auto" onclick="chooseOnMap()">🗺️ Choose on map</button></div>
+        <p style="font-size:12px;color:var(--muted);margin:7px 0 0">Use your GPS or drop a pin on the map — no typing needed.</p>`}
+    <label>Drop-off city${multi?' (same for all addresses)':''}</label>
+    <select onchange="draft.toCity=this.value;render()">${cityOpts(draft.toCity)}</select>
+    <label style="display:flex;align-items:center;gap:10px;margin:18px 0 0;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);font-weight:600;cursor:pointer">
+      <input type="checkbox" ${multi?'checked':''} onchange="toggleMulti()" style="width:18px;height:18px;accent-color:var(--brand)">
+      Sending items to multiple addresses</label>
+    ${bagFields}
+    ${multi?`<button class="btn ghost sm" style="margin-top:10px" onclick="addAddress()">＋ Add another address</button>`:''}
+    <label>Package size</label>
+    <div class="seg">${Object.entries(SIZES).map(([k,v])=>
+      `<div class="opt ${draft.size===k?'on':''}" onclick="draft.size='${k}';render()">
+        <span class="em" style="font-size:${v.scale}px;height:32px;display:flex;align-items:center;justify-content:center">${v.em}</span>${v.label}</div>`).join('')}</div>
+    <label>Payment method</label>
+    <div class="seg">
+      <div class="opt ${draft.paymentMethod==='cod'?'on':''}" onclick="draft.paymentMethod='cod';render()"><span class="em">💵</span>Cash on delivery</div>
+      <div class="opt ${draft.paymentMethod==='online'?'on':''}" onclick="draft.paymentMethod='online';render()"><span class="em">💳</span>Pay online</div>
+    </div>
+    <label>Notes for captain (optional)</label>
+    <textarea id="f_notes" placeholder="Gate code, fragile, etc." oninput="draft.notes=this.value">${esc(draft.notes)}</textarea>
+    <label>Discount code (optional)</label>
+    <div style="display:flex;gap:8px">
+      <input id="f_code" placeholder="e.g. WELCOME10" value="${esc(draft.code)}" oninput="draft.code=this.value"
+        style="text-transform:uppercase">
+      <button class="btn ghost" style="width:auto;padding:0 18px" onclick="applyCode()">${disc?'Update':'Apply'}</button>
+    </div>
+    ${disc?`<div style="color:var(--green);font-size:12.5px;margin-top:7px;font-weight:700">✓ ${esc(disc.code)} applied — ${discLabel(disc)}
+      <a onclick="draft.code='';draft.discountObj=null;render()" style="color:var(--red);margin-left:8px;cursor:pointer">Remove</a></div>`:''}
+    <div class="banner" style="margin:16px 0 12px;display:flex;align-items:center;justify-content:space-between">
+      <div><div class="bt">${qty} drop-off${qty>1?'s':''} · ${same?'Same city ('+esc(draft.fromCity)+')':esc(draft.fromCity)+' → '+esc(draft.toCity)}</div>
+        <div style="font-size:13px;opacity:.85;margin-top:2px">${jod(perBag)} × ${qty}${disc?' · '+esc(disc.code):''}</div></div>
+      <div style="text-align:right">${disc&&final!==base?`<div style="font-size:13px;opacity:.7;text-decoration:line-through">${jod(base)}</div>`:''}
+        <div class="bv">${jod(final)}</div></div></div>
+    <div style="display:flex;gap:8px;background:var(--amber-soft);color:var(--amber);border-radius:12px;
+      padding:11px 13px;font-size:12px;line-height:1.45;margin-bottom:12px;font-weight:600">
+      <span>⚠️</span><span>We don't transport anything illegal or prohibited. By posting, you confirm your items comply with the law.</span></div>
+    <button class="btn" onclick="submitDelivery()">Post delivery · ${jod(final)}</button>
+    <div style="height:12px"></div>`;
+}
+function submitDelivery(){
+  if(!draft.pickCoords){toast('Tap “Use my current location” to set pickup');return;}
+  for(let i=0;i<draft.bags.length;i++){const b=draft.bags[i];
+    if(!b.recipient.trim()||!b.addr.trim()||!b.mobile.trim()){toast('Fill in all details for bag '+(i+1));return;}}
+  const from='📍 Current location ('+draft.pickCoords+'), '+draft.fromCity;
+  const bags=draft.bags.map(b=>({recipient:b.recipient.trim(),addr:b.addr.trim()+', '+draft.toCity,mobile:b.mobile.trim()}));
+  const base=priceFor(draft.fromCity,draft.toCity)*bags.length;
+  const disc=draft.discountObj;
+  const d={id:nextId++,owner:customerUser.email,fromCity:draft.fromCity,toCity:draft.toCity,from,pickCoords:draft.pickCoords,
+    bags,size:draft.size,notes:draft.notes.trim(),status:'pending',driver:null,paymentMethod:draft.paymentMethod,
+    basePrice:base,discountCode:disc?disc.code:null,price:applyDisc(base,disc)};
+  deliveries.unshift(d);
+  notify('captain',null,'📦','New delivery available',`${bags.length} drop-off${bags.length>1?'s':''} in ${draft.toCity} · ${jod(d.price)}`);
+  screen='track';selected=d.id;tab='home';render();toast('Delivery posted — finding a captain');
+}
+function custTrack(){
+  const d=deliveries.find(x=>x.id===selected); if(!d)return custHome();
+  const steps=['pending','assigned','transit','delivered'], idx=steps.indexOf(d.status);
+  let h=`<button class="back" onclick="back()">‹ All deliveries</button>
+    <div class="between"><h1>Delivery #${d.id}</h1>${pill(d.status)}</div>`;
+  if(d.status==='assigned'||d.status==='transit'){
+    h+=`<div class="banner" style="display:flex;align-items:center;justify-content:space-between">
+        <div><div class="bt">${d.status==='assigned'?'Captain heading to pickup':'On the way to drop-off'}</div>
+          <div style="font-size:12px;opacity:.85;margin-top:2px">🟢 Live tracking</div></div>
+        <div id="etaText" style="font-size:15px;font-weight:800;text-align:right">Locating…</div></div>
+      <div id="trackmap" style="height:210px;border-radius:16px;overflow:hidden;margin-bottom:14px;border:1px solid var(--line);background:#eef2f8"></div>`;
+  } else if(d.status==='delivered'){
+    h+=`<div class="map"><div class="path"></div><span class="pin pinA">📍</span><span class="truck">✅</span><span class="pin pinB">🏁</span></div>`;
+  } else if(d.status==='cancelled'){
+    h+=`<div class="card" style="text-align:center;padding:26px 18px;background:#fef2f2;border-color:#fecaca">
+        <div style="font-size:34px">🚫</div><b style="color:var(--red)">Delivery cancelled</b>
+        <p class="sub" style="margin:6px 0 0">This delivery was cancelled and is no longer active.</p></div>`;
+  } else {
+    h+=`<div class="card" style="text-align:center;padding:26px 18px">
+        <div style="font-size:34px">🔎</div><b>Finding a nearby captain…</b>
+        <p class="sub" style="margin:6px 0 0">Live tracking starts as soon as a captain accepts your delivery.</p></div>`;
+  }
+  h+=`<div class="card">${routeMini(d)}
+      <div class="meta"><span>${SIZES[d.size].em} <b>${SIZES[d.size].label}</b></span>
+      <span><b>${jod(d.price)}</b>${d.discountCode?` <small style="color:var(--green);font-weight:700">🏷️${esc(d.discountCode)}</small>`:''}</span><span><b>${d.fromCity===d.toCity?'Same city':'Cross-city'}</b></span></div></div>`;
+  if(d.driver){h+=`<div class="card"><div class="row">
+      <div style="width:44px;height:44px;border-radius:50%;background:var(--brand-soft);
+        display:flex;align-items:center;justify-content:center;font-size:20px">🧑‍✈️</div>
+      <div><b>${esc(d.driver.name)}</b><div style="font-size:12px;color:var(--muted)">
+        ${esc(d.driver.vehicle)} · ${esc(d.driver.plate)}</div></div>
+      <div style="margin-left:auto;font-size:22px">📞</div></div></div>`;}
+  if(d.status==='pending'||d.status==='assigned'){
+    h+=`<button class="btn danger" onclick="cancelDelivery(${d.id})">Cancel delivery</button>
+      <p class="sub" style="text-align:center;margin-top:8px">You can cancel free until the captain picks up your package.</p>`;
+  }
+  if(d.status!=='cancelled'){
+    h+=`<h2>Progress</h2><div class="card">`+
+      ['Delivery posted','Captain assigned','Picked up & in transit','Delivered']
+      .map((t,i)=>`<div class="stop ${i<3?'':'drop'}" style="${i<=idx?'':'opacity:.4'}">
+        <div class="ic"><span class="mark" style="${i<=idx?'background:var(--brand);border-color:var(--brand)':''}"></span>
+        ${i<3?'<span class="line"></span>':''}</div>
+        <div class="txt"><div>${t}</div></div></div>`).join('')+`</div>`;
+    if(d.status!=='delivered')h+=`<p class="sub" style="text-align:center">Captain updates status live as they go.</p>`;
+  }
+  return h;
+}
+function cancelDelivery(id){
+  const d=deliveries.find(x=>x.id===id); if(!d||!(d.status==='pending'||d.status==='assigned'))return;
+  if(!confirm('Cancel this delivery?'+(d.status==='assigned'?'\n\nA captain has already accepted — they’ll be notified.':'')))return;
+  const capEmail=d.driver&&d.driver.email;
+  d.status='cancelled'; d.driver=null; d.track=null; stopTracking();
+  if(capEmail) notify('captain',capEmail,'🚫','Delivery cancelled',`The customer cancelled job #${d.id}.`);
+  render(); toast('Delivery cancelled');
+}
+
+/* ===== DRIVER ===== */
+function renderDriver(){
+  if(tab==='profile') return screen==='settings'?editProfile():profile();
+  if(screen==='jobDetail') return driverJob();
+  if(tab==='earn') return screen==='settle'?settleForm():driverEarnings();
+  if(tab==='trips') return driverTrips();
+  return driverJobs();
+}
+function myJobs(){return deliveries.filter(d=>d.driver&&d.driver.email===driver.email);}
+function myActiveJob(){return deliveries.find(d=>d.driver&&d.driver.email===driver.email&&d.status!=='delivered');}
+function parseCoords(s){const m=(s||'').match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/);return m?[parseFloat(m[1]),parseFloat(m[2])]:null;}
+function haversine(a,b){const R=6371,rad=x=>x*Math.PI/180;
+  const dLa=rad(b[0]-a[0]),dLo=rad(b[1]-a[1]);
+  const s=Math.sin(dLa/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(b[0]))*Math.sin(dLo/2)**2;
+  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));}
+const RADIUS_KM=5;
+function jobDistance(d){ if(!driver.loc)return null; const c=parseCoords(d.pickCoords)||parseCoords(d.from); if(!c)return null;
+  return haversine([driver.loc.lat,driver.loc.lng],c); }
+function navUrl(x){ const c=parseCoords(x); const dest=c?c[0]+','+c[1]:encodeURIComponent(x);
+  return 'https://www.google.com/maps/dir/?api=1&destination='+dest; }
+
+/* ---- live tracking (simulated captain movement) ---- */
+let trackMap=null, trackTimer=null, capMarker=null, tgtMarker=null;
+function trackTarget(d){ return d.status==='assigned'? parseCoords(d.pickCoords)
+  : (parseCoords((d.bags[0]||{}).addr)||parseCoords(d.pickCoords)); }
+function stopTracking(){ if(trackTimer){clearInterval(trackTimer);trackTimer=null;}
+  if(trackMap){try{trackMap.remove();}catch(e){} trackMap=null;} capMarker=tgtMarker=null; }
+function setupTracking(id){
+  stopTracking();
+  const d=deliveries.find(x=>x.id===id); if(!d)return;
+  if(!(d.status==='assigned'||d.status==='transit'))return;
+  if(typeof L==='undefined')return;
+  const el=document.getElementById('trackmap'); if(!el)return;
+  const target=trackTarget(d); if(!target)return;
+  if(!d.track){ d.track={lat:target[0]+0.03,lng:target[1]+0.022}; } // captain starts ~3km away
+  trackMap=L.map('trackmap',{zoomControl:false,attributionControl:false});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(trackMap);
+  const capIcon=L.divIcon({html:'<div style="font-size:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">🚗</div>',className:'',iconSize:[26,26],iconAnchor:[13,13]});
+  const tgtIcon=L.divIcon({html:'<div style="font-size:26px">📍</div>',className:'',iconSize:[26,26],iconAnchor:[13,26]});
+  capMarker=L.marker([d.track.lat,d.track.lng],{icon:capIcon}).addTo(trackMap);
+  tgtMarker=L.marker(target,{icon:tgtIcon}).addTo(trackMap);
+  trackMap.fitBounds([[d.track.lat,d.track.lng],target],{padding:[40,40]});
+  updateEta(id);
+  trackTimer=setInterval(()=>tickTrack(id),1000);
+}
+function tickTrack(id){
+  const d=deliveries.find(x=>x.id===id);
+  if(!d||!d.track||!(d.status==='assigned'||d.status==='transit')){ stopTracking(); return; }
+  const tgt=trackTarget(d); if(!tgt)return;
+  d.track.lat += (tgt[0]-d.track.lat)*0.09;
+  d.track.lng += (tgt[1]-d.track.lng)*0.09;
+  if(capMarker) capMarker.setLatLng([d.track.lat,d.track.lng]);
+  updateEta(id);
+}
+function updateEta(id){
+  const d=deliveries.find(x=>x.id===id); if(!d||!d.track)return;
+  const tgt=trackTarget(d); if(!tgt)return;
+  const km=haversine([d.track.lat,d.track.lng],tgt);
+  const el=document.getElementById('etaText'); if(!el)return;
+  if(km<0.1){ el.textContent = d.status==='assigned'?'Arrived at pickup':'Arriving now'; }
+  else el.textContent = km.toFixed(1)+' km · ~'+Math.max(1,Math.round(km/25*60))+' min away';
+}
+function enableCaptainLocation(){
+  if(!navigator.geolocation){toast('Location not supported on this device');return;}
+  toast('Getting your location…');
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ driver.loc={lat:pos.coords.latitude,lng:pos.coords.longitude}; render(); toast('📍 Location enabled'); },
+    err=>{ toast(err.code===1?'Location permission denied':'Couldn’t get your location'); },
+    {enableHighAccuracy:true,timeout:9000,maximumAge:0});
+}
+function driverJobs(){
+  let open=deliveries.filter(d=>d.status==='pending');
+  const active=myActiveJob();
+  let h=`<h1>Hi, ${esc(driver.name.split(' ')[0])} 👋</h1><p class="sub">Available jobs near you</p>`;
+  if(active)h+=`<div class="banner" style="cursor:pointer" onclick="openItem(${active.id},'jobDetail')">
+      <div class="bt">Your active delivery</div>
+      <div class="bv">Job #${active.id} · ${STATUS[active.status].label}</div>
+      <div style="font-size:12px;opacity:.85;margin-top:4px">Tap to continue — finish it before claiming another</div></div>`;
+  if(!driver.loc){
+    return h+`<div class="card" style="border-color:var(--brand);text-align:center;padding:26px 18px">
+      <div style="font-size:34px">📍</div>
+      <b style="font-size:16px">Enable your location</b>
+      <p class="sub" style="margin:6px 0 14px">Turn on location to find the delivery jobs closest to you.</p>
+      <button class="btn" onclick="enableCaptainLocation()">Enable location</button></div>`;
+  }
+  h+=`<div class="between" style="background:var(--green-soft);color:var(--green);padding:9px 13px;border-radius:12px;margin-bottom:12px;font-size:13px;font-weight:700">
+      <span>📍 You: ${driver.loc.lat.toFixed(4)}, ${driver.loc.lng.toFixed(4)}</span><a onclick="enableCaptainLocation()" style="color:var(--green);cursor:pointer">Refresh</a></div>`;
+  const list=open.map(d=>({d,dist:jobDistance(d)}))
+    .filter(x=>x.dist!=null&&x.dist<=RADIUS_KM)
+    .sort((a,b)=>a.dist-b.dist);
+  if(!list.length)return h+emptyState('📭',`No jobs within ${RADIUS_KM} km`,'No pickups near you right now. Check back soon or tap Refresh.');
+  h+=`<p style="font-size:12px;color:var(--muted);margin:0 2px 10px">Showing pickups within ${RADIUS_KM} km, nearest first.</p>`;
+  list.forEach(({d,dist})=>{
+    const n=bagCount(d);
+    h+=`<div class="card tap" onclick="openItem(${d.id},'jobDetail')">
+      <div class="between"><b>${jod(d.price)} · ${n} bag${n>1?'s':''}</b>
+        <span class="pill p-assigned">📍 ${dist.toFixed(1)} km</span></div>
+      ${routeMini(d)}<div style="height:8px"></div>
+      ${active?`<button class="btn sm" disabled style="opacity:.5">Finish current delivery first</button>`
+        :`<button class="btn sm" onclick="event.stopPropagation();claim(${d.id})">Claim this job</button>`}</div>`;
+  });
+  return h;
+}
+function driverJob(){
+  const d=deliveries.find(x=>x.id===selected); if(!d)return driverJobs();
+  const mine=d.driver&&d.driver.email===driver.email;
+  const n=bagCount(d);
+  let h=`<button class="back" onclick="back()">‹ Back</button>
+    <div class="between"><h1>Job #${d.id}</h1>${pill(d.status)}</div>
+    <div class="stat"><div class="box"><div class="v">${d.price}</div><div class="l">JOD payout</div></div>
+      <div class="box"><div class="v" style="font-size:15px">${esc(d.fromCity)}→${esc(d.toCity)}</div><div class="l">Route</div></div>
+      <div class="box"><div class="v">${n}</div><div class="l">Bag${n>1?'s':''}</div></div></div>
+    <div style="height:14px"></div>
+    <div class="card"><small style="color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase">Pickup</small>
+      <div style="font-weight:600;margin:2px 0 9px">${esc(d.from)}</div>
+      <a class="btn ghost sm" href="${navUrl(d.pickCoords||d.from)}" target="_blank" rel="noopener"
+        style="display:block;text-align:center;text-decoration:none;padding:10px">🧭 Navigate to pickup</a></div>
+    <div class="card"><small style="color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase">Drop-offs (${n}) — tap to navigate</small>
+      ${d.bags.map((b,i)=>`<div style="padding:11px 0;${i<n-1?'border-bottom:1px solid var(--line)':''}">
+        <b>${n>1?(i+1)+'. ':''}${esc(b.recipient)}</b>
+        <a href="${navUrl(b.addr)}" target="_blank" rel="noopener" style="display:block;font-size:13px;color:var(--brand);font-weight:600;margin-top:2px;text-decoration:none">🧭 ${esc(b.addr)}</a>
+        <a href="tel:${esc(b.mobile)}" style="display:inline-block;font-size:13px;margin-top:4px;color:var(--ink);text-decoration:none">📞 ${esc(b.mobile)}</a></div>`).join('')}
+      ${d.notes?`<div style="margin-top:8px;font-size:13px;color:var(--muted)">📝 ${esc(d.notes)}</div>`:''}</div>`;
+  if(!mine&&d.status==='pending'){
+    h+= myActiveJob()
+      ? `<div class="card" style="text-align:center;color:var(--muted);font-size:13px">Finish your current delivery before claiming another.</div>`
+      : `<button class="btn" onclick="claim(${d.id})">Claim this job · ${jod(d.price)}</button>`;
+  }
+  else if(d.status==='assigned'){
+    h+=`<button class="btn" onclick="advance(${d.id})">Confirm pickup →</button>
+      <div style="height:10px"></div>
+      <button class="btn danger" onclick="cancelClaim(${d.id})">Cancel claim</button>
+      <p class="sub" style="text-align:center;margin-top:8px">You can cancel until you confirm pickup.</p>`;
+  }
+  else if(d.status==='transit'){
+    if((d.paymentMethod||'cod')==='cod')h+=`<div class="card" style="text-align:center;background:var(--amber-soft);border-color:var(--amber);color:var(--amber);font-weight:700;font-size:13px">💵 Collect ${jod(d.price)} cash from the recipient</div>`;
+    h+=`<button class="btn green" onclick="advance(${d.id})">Mark as delivered ✓</button>`;
+  }
+  else if(d.status==='delivered'){
+    const cod=(d.paymentMethod||'cod')==='cod', comm=round2(d.price*COMMISSION), net=round2(d.price-comm);
+    h+=`<div class="card" style="text-align:center;background:var(--green-soft);border-color:var(--green)">
+      <b style="color:var(--green)">✓ Delivered</b>
+      <div style="font-size:13px;color:var(--muted);margin-top:3px">You earned ${jod(net)}${cod?` · you owe Droply ${jod(comm)}`:''}</div></div>`;
+  }
+  return h;
+}
+function claim(id){
+  const d=deliveries.find(x=>x.id===id); if(!d||d.status!=='pending')return;
+  if(myActiveJob()){toast('Finish your current delivery first');return;}
+  d.driver={name:driver.name,email:driver.email,vehicle:driver.vehicle,plate:driver.plate}; d.status='assigned';
+  notify('customer',d.owner,'🧑‍✈️','Captain assigned',`${driver.name} accepted your delivery and is heading to the pickup.`);
+  selected=id;screen='jobDetail';render();toast('Job claimed! Head to pickup.');
+}
+function cancelClaim(id){
+  const d=deliveries.find(x=>x.id===id); if(!d||d.status!=='assigned')return;
+  if(!confirm('Cancel this claim?\n\nThe job will be released back to other captains.'))return;
+  d.driver=null; d.status='pending'; d.track=null;
+  notify('customer',d.owner,'⚠️','Captain cancelled','Your captain cancelled — we’re finding another captain for you.');
+  notify('captain',null,'📦','Delivery available again',`${bagCount(d)} drop-off${bagCount(d)>1?'s':''} in ${d.toCity} · ${jod(d.price)}`);
+  screen='main';tab='home';selected=null;render();toast('Claim cancelled — job is open again');
+}
+function advance(id){
+  const d=deliveries.find(x=>x.id===id); if(!d)return;
+  if(d.status==='assigned'){d.status='transit';
+    notify('customer',d.owner,'📦','Package picked up','Your package is on the way to the drop-off.');
+    toast('Pickup confirmed — in transit');}
+  else if(d.status==='transit'){
+    d.status='delivered';
+    const comm=round2(d.price*COMMISSION), net=round2(d.price-comm);
+    d.commission=comm; d.captainNet=net;
+    driver.earnings=round2((driver.earnings||0)+net);
+    if((d.paymentMethod||'cod')==='cod') driver.owed=round2((driver.owed||0)+comm);
+    notify('customer',d.owner,'✅','Delivered','Your delivery is complete. Thanks for using Droply!');
+    toast('Delivered! You earned '+jod(net));
+  }
+  render();
+}
+function openSettle(){ settleDraft={amount:String(driver.owed||''),proof:null,ref:''}; screen='settle'; render(); }
+function onProof(input){ const f=input.files&&input.files[0]; if(!f)return; settleDraft.proof=f.name; render(); }
+function settleForm(){
+  const owed=driver.owed||0;
+  return `<button class="back" onclick="screen='main';render()">‹ Back</button>
+    <h1>Transfer to Droply</h1>
+    <p class="sub">You owe <b>${jod(owed)}</b>. Send it via ATM or bank transfer, then submit the details below — we'll verify and update your balance.</p>
+    <label>Amount you transferred (JOD)</label>
+    <input id="st_amount" type="number" min="0" step="0.5" value="${esc(settleDraft.amount)}" oninput="settleDraft.amount=this.value">
+    <label>Bank / transfer reference (optional)</label>
+    <input id="st_ref" placeholder="e.g. transfer no. / ATM ref" value="${esc(settleDraft.ref)}" oninput="settleDraft.ref=this.value">
+    <label>Proof of transfer</label>
+    <label class="upl ${settleDraft.proof?'done':''}" for="st_proof">
+      <span class="upl-ic">🧾</span>
+      <span class="upl-txt"><span class="upl-t">Transfer receipt</span>
+        <span class="upl-status">${settleDraft.proof?'✓ '+esc(settleDraft.proof):'Tap to upload a photo or PDF'}</span></span>
+      <span class="chev">›</span></label>
+    <input type="file" id="st_proof" accept="image/*,application/pdf" hidden onchange="onProof(this)">
+    <div style="height:18px"></div>
+    <button class="btn" onclick="submitTransfer()">Submit for review</button>`;
+}
+function submitTransfer(){
+  const amt=parseFloat(settleDraft.amount);
+  if(!(amt>0)){toast('Enter the amount you transferred');return;}
+  if(!settleDraft.proof){toast('Upload your transfer receipt');return;}
+  driver.pendingTransfers=driver.pendingTransfers||[];
+  driver.pendingTransfers.unshift({amount:round2(amt),ref:settleDraft.ref.trim(),proof:settleDraft.proof,
+    date:new Date().toISOString().slice(0,10),status:'pending'});
+  screen='main'; render(); toast('Transfer submitted — under review');
+}
+function driverTrips(){
+  const jobs=myJobs();
+  let h=`<h1>My trips</h1><p class="sub">Jobs you've claimed</p>`;
+  if(!jobs.length)return h+emptyState('🚚','No trips yet','Claim a job from the Jobs tab to get started.');
+  jobs.slice().reverse().forEach(d=>{
+    h+=`<div class="card tap" onclick="openItem(${d.id},'jobDetail')">
+      <div class="between"><b>#${d.id} · ${jod(d.price)}</b>${pill(d.status)}</div>${routeMini(d)}</div>`;});
+  return h;
+}
+function driverEarnings(){
+  const done=myJobs().filter(d=>d.status==='delivered'), active=myJobs().filter(d=>d.status!=='delivered').length;
+  const owed=driver.owed||0;
+  const pending=(driver.pendingTransfers||[]).filter(t=>t.status==='pending');
+  const pendingSum=round2(pending.reduce((s,t)=>s+t.amount,0));
+  let h=`<h1>Earnings</h1><p class="sub">Your Droply activity</p>`;
+  if(owed>0){
+    h+=`<div class="card" style="border-color:var(--amber);background:var(--amber-soft)">
+      <div class="between"><div><b style="color:var(--amber);font-size:15px">Owed to Droply</b>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Commission from cash (COD) deliveries you collected</div></div>
+        <div style="font-size:24px;font-weight:800;color:var(--amber)">${jod(owed)}</div></div>
+      ${pendingSum>0?`<div style="font-size:12px;color:var(--muted);margin-top:8px">⏳ ${jod(pendingSum)} submitted — under review. Your balance updates once we verify it.</div>`:''}
+      <div style="height:12px"></div>
+      <button class="btn" onclick="openSettle()">I've transferred — submit proof</button>
+      <div style="font-size:12px;color:var(--muted);margin-top:9px;line-height:1.45">Transfer the amount via ATM or bank, then submit how much you sent with a receipt. We'll verify and reduce your balance.</div></div>`;
+  }
+  if((driver.pendingTransfers||[]).length){
+    h+=`<h2>Your transfers</h2>`;
+    driver.pendingTransfers.forEach(t=>{
+      const st=t.status==='pending'?'<span class="pill p-pending">Under review</span>':t.status==='approved'?'<span class="pill p-done">Approved</span>':'<span class="pill" style="background:#fee2e2;color:#dc2626">Rejected</span>';
+      h+=`<div class="card"><div class="between"><div><b>${jod(t.amount)}</b>
+        <div style="font-size:12px;color:var(--muted)">${esc(t.date)}${t.ref?' · '+esc(t.ref):''} · 🧾 ${esc(t.proof)}</div></div>${st}</div></div>`;});
+  }
+  h+=`<div class="banner"><div class="bt">Your net earnings</div><div class="bv">${jod(driver.earnings||0)}</div></div>
+    <div class="stat"><div class="box"><div class="v">${done.length}</div><div class="l">Delivered</div></div>
+      <div class="box"><div class="v">${active}</div><div class="l">Active</div></div>
+      <div class="box"><div class="v">${driver.vehicle==='Car'?'🚗':'🏍️'}</div><div class="l">${driver.vehicle}</div></div></div>
+    <p style="font-size:12px;color:var(--muted);margin:2px 2px 0">Droply keeps ${COMMISSION*100}% of each delivery fee. On cash orders you collect the full fee and transfer our share; on online orders we pay your share directly.</p>
+    <h2>Recent deliveries</h2>`;
+  if(!done.length)return h+emptyState('💸','No deliveries yet','Complete a delivery to earn.');
+  done.slice().reverse().forEach(d=>{
+    const n=bagCount(d), cod=(d.paymentMethod||'cod')==='cod';
+    h+=`<div class="card"><div class="between"><div><b>Delivery #${d.id}</b>
+      <div style="font-size:12px;color:var(--muted)">${n} bag${n>1?'s':''} · ${esc(d.toCity)} · ${cod?'💵 Cash':'💳 Online'}</div></div>
+      <div style="text-align:right"><b style="color:var(--green)">+${jod(d.captainNet!=null?d.captainNet:d.price)}</b>
+        ${cod&&d.commission?`<div style="font-size:11px;color:var(--amber)">${jod(d.commission)} owed</div>`:''}</div></div></div>`;});
+  return h;
+}
+
+/* ===== PROFILE ===== */
+function pfpEl(u,editable){
+  const fallback = role==='driver'?'🧑‍✈️':'🙂';
+  const style = u.photo?`background-image:url('${u.photo}')`:'';
+  return `<div class="pfp"><div class="img" style="${style}">${u.photo?'':fallback}</div>
+    ${editable?`<label class="cam" for="pfp_input">📷</label>
+      <input type="file" id="pfp_input" accept="image/*" hidden onchange="uploadPhoto(this)">`:''}</div>`;
+}
+function profile(){
+  const u=currentUser();
+  const rows = role==='driver'
+    ? [['Name',u.name],['Email',u.email],['Mobile',u.mobile||'—'],['City',u.city||'—'],['Vehicle',u.vehicle],['Plate',u.plate],['Total earned',jod(u.earnings)]]
+    : [['Name',u.name],['Email',u.email],['Mobile',u.mobile||'—'],['City',u.city||'—'],['Deliveries sent',String(myDeliveries().length)]];
+  const verified = role==='driver' && u.verified;
+  return `<h1>Profile</h1><p class="sub">Your account</p>
+    <div class="card" style="text-align:center">
+      ${pfpEl(u,true)}
+      <b style="font-size:18px">${esc(u.name)}</b>
+      <div style="font-size:13px;color:var(--muted)">${esc(u.email)}</div>
+      ${verified?'<div style="margin-top:8px"><span class="vbadge">✓ Verified captain</span></div>':''}</div>
+    <div class="card">${rows.map(([k,v])=>`<div class="prof-row"><span>${k}</span><b>${esc(String(v))}</b></div>`).join('')}</div>
+    <button class="btn ghost" onclick="screen='settings';render()">✎ Edit profile</button>
+    <div style="height:10px"></div>
+    <button class="btn outline" onclick="backToPicker()">↺ Switch role</button>
+    <div style="height:10px"></div>
+    <button class="btn danger" onclick="logout()">Log out</button>`;
+}
+function editProfile(){
+  const u=currentUser();
+  const driverFields = role==='driver'?`
+    <label>Mobile number</label><input id="p_mobile" value="${esc(u.mobile||'')}">
+    <label>City</label><select id="p_city">${JO_CITIES.map(c=>`<option ${u.city===c?'selected':''}>${c}</option>`).join('')}</select>
+    <label>Vehicle</label><select id="p_veh"><option ${u.vehicle==='Car'?'selected':''}>Car</option><option ${u.vehicle==='Motorcycle'?'selected':''}>Motorcycle</option></select>
+    <label>License plate</label><input id="p_plate" value="${esc(u.plate||'')}">`
+  :`<label>Mobile number</label><input id="p_mobile" value="${esc(u.mobile||'')}">
+    <label>City</label><select id="p_city">${JO_CITIES.map(c=>`<option ${u.city===c?'selected':''}>${c}</option>`).join('')}</select>`;
+  return `<button class="back" onclick="screen='main';render()">‹ Back</button>
+    <h1>Edit profile</h1><p class="sub">Update your details</p>
+    <div style="text-align:center;margin-bottom:6px">${pfpEl(u,true)}
+      <div style="font-size:12px;color:var(--muted)">Tap the camera to change your photo</div></div>
+    <label>Full name</label><input id="p_name" value="${esc(u.name)}">
+    <label>Email</label><input value="${esc(u.email)}" disabled style="opacity:.6">
+    ${driverFields}
+    <div style="height:18px"></div>
+    <button class="btn" onclick="saveProfile()">Save changes</button>
+    <div style="height:10px"></div>
+    <button class="btn outline" onclick="screen='main';render()">Cancel</button>`;
+}
+function uploadPhoto(input){
+  const f=input.files&&input.files[0]; if(!f)return;
+  const reader=new FileReader();
+  reader.onload=e=>{ currentUser().photo=e.target.result; render(); toast('Photo updated'); };
+  reader.readAsDataURL(f);
+}
+function saveProfile(){
+  const u=currentUser();
+  const name=($('p_name').value||'').trim();
+  if(!name){toast('Name cannot be empty');return;}
+  u.name=name; u.mobile=($('p_mobile').value||'').trim();
+  if(role==='driver'){ u.city=$('p_city').value; u.vehicle=$('p_veh').value; u.plate=($('p_plate').value||'').trim()||'—'; }
+  else { u.city=$('p_city').value; }
+  screen='main'; render(); toast('Profile saved');
+}
+
+/* ===== SHARED ===== */
+function emptyState(em,t,s){return `<div class="empty"><span class="e-em">${em}</span><b>${t}</b><br>${s}</div>`;}
+function renderNav(){
+  const n=$('nav');
+  const nav = role==='customer'
+    ? [['home','🏠','Home'],['new','＋','Send'],['profile','🙂','Profile']]
+    : [['home','🧾','Jobs'],['trips','🚚','My trips'],['earn','💰','Earnings'],['profile','🙂','Profile']];
+  n.style.display='flex';
+  n.innerHTML=nav.map(([t,i,l])=>
+    `<a class="${tab===t&&screen==='main'?'on':''}" onclick="go('${t}')"><span class="ni">${i}</span>${l}</a>`).join('');
+}
+
+/* ---- register service worker (makes the app installable) ---- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
+/* ---- restore session on load: land straight in the app if already signed in ---- */
+(async () => {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) await loadProfileAndRoute();
+  } catch (e) { /* stay on picker */ }
+})();
+</script>
+</body>
+</html>
