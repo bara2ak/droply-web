@@ -252,11 +252,12 @@
     .statusbar{ display:none; }
     .screen{ top:0; padding-top:env(safe-area-inset-top); }
     /* only the content area scrolls; header + bottom nav stay put */
-    .body{ overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding-bottom:calc(100px + env(safe-area-inset-bottom)); }
+    .body{ overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding-bottom:24px; }
     .picker{ padding-top:calc(34px + env(safe-area-inset-top)); }
-    /* auto height so the icons always sit above the system/home bar */
-    .nav{ height:auto; min-height:66px; padding-top:8px; padding-bottom:max(20px, env(safe-area-inset-bottom)); }
-    .nav a .ni{ line-height:1; }
+    /* nav sits in normal flow at the bottom of the column, so it can never
+       slide under the home/gesture bar; padding reserves the safe area */
+    .nav{ position:static; height:auto; min-height:auto; padding-top:8px;
+          padding-bottom:max(10px, env(safe-area-inset-bottom)); }
     .notifpanel, .oscenter, .mapoverlay{ top:0; padding-top:env(safe-area-inset-top); }
     .switch{ top:calc(10px + env(safe-area-inset-top)); }
   }
