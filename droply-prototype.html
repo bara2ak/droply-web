@@ -1250,6 +1250,18 @@ function renderNav(){
   var ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (standalone && ios) document.documentElement.classList.add('ios-pwa');
 })();
+/* ---- pin the phone container to the REAL visible height (fixes iOS where the
+        container can be taller than the screen, pushing the nav off-bottom) ---- */
+function setAppHeight(){
+  var p = document.querySelector('.phone'); if(!p) return;
+  var mobile = (window.matchMedia && window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches) || window.innerWidth <= 500;
+  if (mobile){ var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight; p.style.height = vh + 'px'; }
+  else { p.style.height = ''; }
+}
+window.addEventListener('resize', setAppHeight);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', setAppHeight);
+window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight, 200); });
+setAppHeight();
 
 /* ---- register service worker (makes the app installable) ---- */
 if ('serviceWorker' in navigator) {
