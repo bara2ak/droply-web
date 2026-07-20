@@ -261,6 +261,9 @@
     .notifpanel, .oscenter, .mapoverlay{ top:0; padding-top:env(safe-area-inset-top); }
     .switch{ top:calc(10px + env(safe-area-inset-top)); }
   }
+  /* iOS installed PWA: env() safe-area is unreliable, so guarantee clearance */
+  html.ios-pwa .nav{ position:static !important; padding-top:8px !important; padding-bottom:34px !important; height:auto !important; min-height:auto !important; }
+  html.ios-pwa .screen{ padding-top:max(14px, env(safe-area-inset-top)); }
 </style>
 </head>
 <body>
@@ -1240,6 +1243,13 @@ function renderNav(){
   n.innerHTML=nav.map(([t,i,l])=>
     `<a class="${tab===t&&screen==='main'?'on':''}" onclick="go('${t}')"><span class="ni">${i}</span>${l}</a>`).join('');
 }
+
+/* ---- tag iOS installed PWA so we can guarantee bottom-nav clearance ---- */
+(function(){
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  var ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (standalone && ios) document.documentElement.classList.add('ios-pwa');
+})();
 
 /* ---- register service worker (makes the app installable) ---- */
 if ('serviceWorker' in navigator) {
