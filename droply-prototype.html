@@ -1081,7 +1081,8 @@ async function submitDelivery(){
   toast('Posting…');
   try{
     const {data:del,error}=await sb.from('deliveries').insert({
-      customer_id:customerUser.id, from_city:draft.fromCity, to_city:draft.toCity, pickup_addr:from,
+      customer_id:customerUser.id, customer_name:customerUser.name, customer_mobile:customerUser.mobile,
+      from_city:draft.fromCity, to_city:draft.toCity, pickup_addr:from,
       pickup_lat:isNaN(plat)?null:plat, pickup_lng:isNaN(plng)?null:plng,
       size:draft.size, notes:draft.notes.trim(), payment_method:draft.paymentMethod,
       status:'pending', base_price:base, price, discount_code:disc?disc.code:null }).select().single();
@@ -1319,7 +1320,7 @@ function driverJob(){
 async function claim(id){
   const d=deliveries.find(x=>x.id===id); if(!d||d.status!=='pending')return;
   if(myActiveJob()){toast('Finish your current delivery first');return;}
-  const {error}=await sb.from('deliveries').update({captain_id:driver.id,status:'assigned'}).eq('id',id);
+  const {error}=await sb.from('deliveries').update({captain_id:driver.id,captain_name:driver.name,status:'assigned'}).eq('id',id);
   if(error){toast(error.message);return;}
   await loadDeliveries();
   selected=id;screen='jobDetail';render();toast('Job claimed! Head to pickup.');
@@ -1373,7 +1374,7 @@ async function submitTransfer(){
   const amt=parseFloat(settleDraft.amount);
   if(!(amt>0)){toast('Enter the amount you transferred');return;}
   if(!settleDraft.proof){toast('Upload your transfer receipt');return;}
-  await sb.from('settlements').insert({captain_id:driver.id,amount:round2(amt),reference:settleDraft.ref.trim(),status:'pending'});
+  await sb.from('settlements').insert({captain_id:driver.id,captain_name:driver.name,amount:round2(amt),reference:settleDraft.ref.trim(),status:'pending'});
   await loadTransfers();
   screen='main'; render(); toast('Transfer submitted — under review');
 }
