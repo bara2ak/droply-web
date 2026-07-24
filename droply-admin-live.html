@@ -387,60 +387,164 @@ function rpData(){
     cancelled:dels.filter(d=>d.status==='cancelled').length,
     active:dels.filter(d=>['pending','assigned','transit'].includes(d.status)).length};
 }
+let rpTab='overall';
+function rpGo(t){ rpTab=t; render(); }
+const kpiCard=(l,v,d)=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${d?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${d}</div>`:''}</div>`;
 function viewReports(){
-  const r=rpData();
   const label = (!rpFrom&&!rpTo) ? 'All time' : `${rpFrom||'…'} → ${rpTo||'…'}`;
-  const kpi=(l,v,d)=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${d?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${d}</div>`:''}</div>`;
   const presetBtn=(k,t)=>`<button class="mini ${rpPreset===k?'b':''}" style="${rpPreset===k?'border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)':''}" onclick="applyPreset('${k}')">${t}</button>`;
-  // per-day breakdown
-  const byDay={};
-  r.dels.forEach(d=>{ const k=dstr(d.created_at); byDay[k]=byDay[k]||{n:0,rev:0,done:0};
-    byDay[k].n++; if(d.status==='delivered'){byDay[k].done++; byDay[k].rev+=Number(d.price||0);} });
-  const days=Object.keys(byDay).sort().reverse();
-  const dayRows=days.map(k=>`<tr><td>${k}</td><td>${byDay[k].n}</td><td>${byDay[k].done}</td><td>${jod(byDay[k].rev)}</td></tr>`).join('')
-    || `<tr><td class="empty" colspan="4">No deliveries in this period</td></tr>`;
-  // top captains
-  const byCap={};
-  r.delivered.forEach(d=>{ if(!d.captain_id)return; byCap[d.captain_id]=byCap[d.captain_id]||{n:0,rev:0};
-    byCap[d.captain_id].n++; byCap[d.captain_id].rev+=Number(d.price||0); });
-  const topCaps=Object.entries(byCap).sort((a,b)=>b[1].n-a[1].n).slice(0,10);
-  const capRows=topCaps.map(([id,v])=>{ const c=captains.find(x=>x.id===id);
-    return `<tr><td>${esc(c?c.name:'—')}</td><td>${v.n}</td><td>${jod(v.rev)}</td></tr>`;}).join('')
-    || `<tr><td class="empty" colspan="3">No completed deliveries in this period</td></tr>`;
-  return `<div class="head"><div><h1>Reports</h1><div class="sub">${label}</div></div>
-    <button class="btn sm outline" onclick="reload()">↻ Refresh</button></div>
-    <div class="card">
+  const tabs=[['overall','▤ Overall'],['captains','🚗 Captains'],['deliveries','📦 Deliveries'],['customers','🙂 Customers'],['financial','💰 Financial']];
+  const tabBar=`<div style="display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px;padding-bottom:0">
+    ${tabs.map(([k,t])=>`<button onclick="rpGo('${k}')" style="border:none;background:none;cursor:pointer;padding:10px 14px;font-weight:700;font-size:13.5px;
+      color:${rpTab===k?'var(--brand)':'var(--muted)'};border-bottom:3px solid ${rpTab===k?'var(--brand)':'transparent'}">${t}</button>`).join('')}</div>`;
+  const filters=`<div class="card">
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         ${presetBtn('all','All time')}${presetBtn('today','Today')}${presetBtn('7','Last 7 days')}${presetBtn('30','Last 30 days')}${presetBtn('month','This month')}
       </div>
       <div class="two">
-        <div><label>From</label><input type="date" id="rp_from" value="${rpFrom}" onchange="rpFrom=this.value;rpPreset='custom';render()"></div>
-        <div><label>To</label><input type="date" id="rp_to" value="${rpTo}" onchange="rpTo=this.value;rpPreset='custom';render()"></div>
+        <div><label>From</label><input type="date" value="${rpFrom}" onchange="rpFrom=this.value;rpPreset='custom';render()"></div>
+        <div><label>To</label><input type="date" value="${rpTo}" onchange="rpTo=this.value;rpPreset='custom';render()"></div>
       </div>
-    </div>
-    <div class="kpis">
-      ${kpi('📦 Deliveries',r.dels.length,`${r.delivered.length} delivered · ${r.active} active · ${r.cancelled} cancelled`)}
-      ${kpi('💰 Revenue',jod(r.revenue),'From delivered orders')}
-      ${kpi('🏦 Droply share',jod(r.commission),'50% commission')}
-      ${kpi('🚗 New captains',r.caps.length,'Registered in period')}
+    </div>`;
+  let body='';
+  if(rpTab==='overall') body=rpOverall();
+  else if(rpTab==='captains') body=rpCaptains();
+  else if(rpTab==='deliveries') body=rpDeliveries();
+  else if(rpTab==='customers') body=rpCustomers();
+  else body=rpFinancial();
+  return `<div class="head"><div><h1>Reports</h1><div class="sub">${label}</div></div>
+    <button class="btn sm outline" onclick="reload()">↻ Refresh</button></div>
+    ${tabBar}${filters}${body}`;
+}
+function rpOverall(){
+  const r=rpData();
+  return `<div class="kpis">
+      ${kpiCard('📦 Deliveries',r.dels.length,`${r.delivered.length} delivered · ${r.active} active · ${r.cancelled} cancelled`)}
+      ${kpiCard('💰 Revenue',jod(r.revenue),'From delivered orders')}
+      ${kpiCard('🚗 New captains',r.caps.length,'Registered in period')}
+      ${kpiCard('🙂 New customers',r.custs.length,'Registered in period')}
     </div>
     <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
-      ${kpi('🙂 New customers',r.custs.length,'Registered in period')}
-      ${kpi('✅ Completion rate',r.dels.length?Math.round(r.delivered.length/r.dels.length*100)+'%':'—','Delivered / total')}
-      ${kpi('📈 Avg order',r.delivered.length?jod(r.revenue/r.delivered.length):'—','Per delivered order')}
+      ${kpiCard('🏦 Droply share',jod(r.commission),'50% commission')}
+      ${kpiCard('✅ Completion rate',r.dels.length?Math.round(r.delivered.length/r.dels.length*100)+'%':'—','Delivered / total')}
+      ${kpiCard('📈 Avg order',r.delivered.length?jod(r.revenue/r.delivered.length):'—','Per delivered order')}
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 18px">
-      <button class="btn sm" onclick="exportCsv('deliveries')">⬇ Export deliveries CSV</button>
-      <button class="btn sm outline" onclick="exportCsv('captains')">⬇ Export captains CSV</button>
-      <button class="btn sm outline" onclick="exportCsv('customers')">⬇ Export customers CSV</button>
-      <button class="btn sm outline" onclick="exportCsv('daily')">⬇ Export daily summary CSV</button>
+    <button class="btn sm" onclick="exportCsv('daily')">⬇ Export daily summary CSV</button>
+    <div style="height:16px"></div>
+    ${dailyPanel(r)}`;
+}
+function dailyPanel(r){
+  const byDay={};
+  r.dels.forEach(d=>{ const k=dstr(d.created_at); byDay[k]=byDay[k]||{n:0,rev:0,done:0};
+    byDay[k].n++; if(d.status==='delivered'){byDay[k].done++; byDay[k].rev+=Number(d.price||0);} });
+  const rows=Object.keys(byDay).sort().reverse().map(k=>
+    `<tr><td>${k}</td><td>${byDay[k].n}</td><td>${byDay[k].done}</td><td>${jod(byDay[k].rev)}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="4">No deliveries in this period</td></tr>`;
+  return `<div class="panel"><div class="ph">Daily breakdown</div>
+    <table><thead><tr><th>Date</th><th>Orders</th><th>Delivered</th><th>Revenue</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function rpCaptains(){
+  const r=rpData();
+  const byCap={};
+  r.delivered.forEach(d=>{ if(!d.captain_id)return; byCap[d.captain_id]=byCap[d.captain_id]||{n:0,rev:0};
+    byCap[d.captain_id].n++; byCap[d.captain_id].rev+=Number(d.price||0); });
+  const ranked=Object.entries(byCap).sort((a,b)=>b[1].n-a[1].n);
+  const rows=ranked.map(([id,v])=>{ const c=captains.find(x=>x.id===id);
+    return `<tr><td>${esc(c?c.name:'—')}</td><td>${esc(c?c.city:'')}</td><td>${v.n}</td><td>${jod(v.rev)}</td><td>${jod(v.rev*0.5)}</td></tr>`;}).join('')
+    || `<tr><td class="empty" colspan="5">No completed deliveries in this period</td></tr>`;
+  const newRows=r.caps.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.mobile)}</td><td>${esc(c.city)}</td>
+    <td>${esc(c.vehicle)}</td><td>${esc(c.status)}</td><td>${c.joined?dstr(c.joined):'—'}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="6">No captains registered in this period</td></tr>`;
+  return `<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+      ${kpiCard('🚗 Total captains',captains.length,'All time')}
+      ${kpiCard('🆕 Joined in period',r.caps.length,'')}
+      ${kpiCard('✅ Verified',captains.filter(c=>c.status==='verified').length,'')}
+      ${kpiCard('⏳ Pending',captains.filter(c=>c.status==='pending').length,'')}
     </div>
-    <div class="grid2" style="align-items:start">
-      <div class="panel"><div class="ph">Daily breakdown</div>
-        <table><thead><tr><th>Date</th><th>Orders</th><th>Delivered</th><th>Revenue</th></tr></thead><tbody>${dayRows}</tbody></table></div>
-      <div class="panel"><div class="ph">Top captains</div>
-        <table><thead><tr><th>Captain</th><th>Delivered</th><th>Revenue</th></tr></thead><tbody>${capRows}</tbody></table></div>
-    </div>`;
+    <button class="btn sm" onclick="exportCsv('captains')">⬇ Export captains CSV</button>
+    <div style="height:16px"></div>
+    <div class="panel" style="margin-bottom:16px"><div class="ph">Captain performance (period)</div>
+      <table><thead><tr><th>Captain</th><th>City</th><th>Delivered</th><th>Revenue</th><th>Droply share</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="panel"><div class="ph">New captains in period</div>
+      <table><thead><tr><th>Name</th><th>Mobile</th><th>City</th><th>Vehicle</th><th>Status</th><th>Joined</th></tr></thead><tbody>${newRows}</tbody></table></div>`;
+}
+function rpDeliveries(){
+  const r=rpData();
+  const byCity={};
+  r.dels.forEach(d=>{ const k=`${d.from_city} → ${d.to_city}`; byCity[k]=(byCity[k]||0)+1; });
+  const cityRows=Object.entries(byCity).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="2">No deliveries in this period</td></tr>`;
+  const rows=r.dels.slice(0,100).map(d=>{
+    const cap=d.captains&&d.captains.profiles?d.captains.profiles.full_name:'—';
+    return `<tr><td>#${d.id}</td><td>${dstr(d.created_at)}</td><td>${esc(d.customer?d.customer.full_name:'—')}</td>
+      <td>${esc(d.from_city)} → ${esc(d.to_city)}</td><td>${esc(cap)}</td><td>${jod(d.price)}</td><td>${esc(d.status)}</td></tr>`;}).join('')
+    || `<tr><td class="empty" colspan="7">No deliveries in this period</td></tr>`;
+  return `<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+      ${kpiCard('📦 Total',r.dels.length,'In period')}
+      ${kpiCard('✅ Delivered',r.delivered.length,'')}
+      ${kpiCard('🚚 Active',r.active,'Pending / assigned / transit')}
+      ${kpiCard('🚫 Cancelled',r.cancelled,'')}
+    </div>
+    <button class="btn sm" onclick="exportCsv('deliveries')">⬇ Export deliveries CSV</button>
+    <div style="height:16px"></div>
+    <div class="panel" style="margin-bottom:16px"><div class="ph">By route</div>
+      <table><thead><tr><th>Route</th><th>Orders</th></tr></thead><tbody>${cityRows}</tbody></table></div>
+    <div class="panel"><div class="ph">Deliveries in period${r.dels.length>100?' (first 100 — export for all)':''}</div>
+      <table><thead><tr><th>ID</th><th>Date</th><th>Customer</th><th>Route</th><th>Captain</th><th>Price</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function rpCustomers(){
+  const r=rpData();
+  const byCust={};
+  r.dels.forEach(d=>{ if(!d.customer_id)return; byCust[d.customer_id]=byCust[d.customer_id]||{n:0,rev:0,name:d.customer?d.customer.full_name:'—'};
+    byCust[d.customer_id].n++; if(d.status==='delivered') byCust[d.customer_id].rev+=Number(d.price||0); });
+  const topRows=Object.values(byCust).sort((a,b)=>b.n-a.n).slice(0,20)
+    .map(c=>`<tr><td>${esc(c.name)}</td><td>${c.n}</td><td>${jod(c.rev)}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="3">No orders in this period</td></tr>`;
+  const newRows=r.custs.map(c=>`<tr><td>${esc(c.full_name)}</td><td>${esc(c.email)}</td><td>${esc(c.mobile||'—')}</td>
+    <td>${esc(c.city||'—')}</td><td>${c.created_at?dstr(c.created_at):'—'}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="5">No customers registered in this period</td></tr>`;
+  return `<div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+      ${kpiCard('🙂 Total customers',customers.length,'All time')}
+      ${kpiCard('🆕 Joined in period',r.custs.length,'')}
+      ${kpiCard('🛒 Ordering customers',Object.keys(byCust).length,'Placed an order in period')}
+    </div>
+    <button class="btn sm" onclick="exportCsv('customers')">⬇ Export customers CSV</button>
+    <div style="height:16px"></div>
+    <div class="panel" style="margin-bottom:16px"><div class="ph">Top customers (period)</div>
+      <table><thead><tr><th>Customer</th><th>Orders</th><th>Spent</th></tr></thead><tbody>${topRows}</tbody></table></div>
+    <div class="panel"><div class="ph">New customers in period</div>
+      <table><thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>City</th><th>Joined</th></tr></thead><tbody>${newRows}</tbody></table></div>`;
+}
+function rpFinancial(){
+  const r=rpData();
+  const cod=r.delivered.filter(d=>(d.payment_method||'cod')==='cod');
+  const online=r.delivered.filter(d=>d.payment_method==='online');
+  const codRev=cod.reduce((s,d)=>s+Number(d.price||0),0);
+  const onlineRev=online.reduce((s,d)=>s+Number(d.price||0),0);
+  const owedTotal=captains.reduce((s,c)=>s+Number(c.owed||0),0);
+  const setl=settlements.filter(s=>inRange(s.created_at));
+  const approved=setl.filter(s=>s.status==='approved').reduce((s,x)=>s+Number(x.amount||0),0);
+  const pendingAmt=setl.filter(s=>s.status==='pending').reduce((s,x)=>s+Number(x.amount||0),0);
+  const setRows=setl.map(s=>{ const c=captains.find(x=>x.id===s.captain_id);
+    return `<tr><td>${s.created_at?dstr(s.created_at):'—'}</td><td>${esc(c?c.name:'—')}</td><td>${jod(s.amount)}</td><td>${esc(s.status)}</td></tr>`;}).join('')
+    || `<tr><td class="empty" colspan="4">No settlements in this period</td></tr>`;
+  return `<div class="kpis">
+      ${kpiCard('💰 Revenue',jod(r.revenue),`${r.delivered.length} delivered orders`)}
+      ${kpiCard('🏦 Droply share',jod(r.commission),'50% commission')}
+      ${kpiCard('🚗 Captains share',jod(r.revenue-r.commission),'50% to captains')}
+      ${kpiCard('📈 Avg order',r.delivered.length?jod(r.revenue/r.delivered.length):'—','Per delivered order')}
+    </div>
+    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+      ${kpiCard('💵 Cash orders',jod(codRev),`${cod.length} orders`)}
+      ${kpiCard('💳 Online orders',jod(onlineRev),`${online.length} orders`)}
+      ${kpiCard('⚠️ Outstanding owed',jod(owedTotal),'Across all captains (current)')}
+      ${kpiCard('✅ Settled in period',jod(approved),pendingAmt?`${jod(pendingAmt)} pending`:'')}
+    </div>
+    <button class="btn sm" onclick="exportCsv('daily')">⬇ Export daily summary CSV</button>
+    <div style="height:16px"></div>
+    <div class="panel" style="margin-bottom:16px"><div class="ph">Settlements in period</div>
+      <table><thead><tr><th>Date</th><th>Captain</th><th>Amount</th><th>Status</th></tr></thead><tbody>${setRows}</tbody></table></div>
+    ${dailyPanel(r)}`;
 }
 function csvCell(v){ const s=(v==null?'':String(v)).replace(/"/g,'""'); return `"${s}"`; }
 function downloadCsv(name,rows){
