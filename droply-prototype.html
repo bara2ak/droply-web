@@ -511,8 +511,17 @@ const AR = {
   "You can cancel free until the captain picks up your package.":"يمكنك الإلغاء مجانًا حتى يستلم الكابتن طردك.",
   "Captain updates status live as they go.":"يحدّث الكابتن الحالة مباشرة أثناء تنقّله.",
   "No pickups near you right now. Check back soon or tap Refresh.":"لا توجد طلبات قريبة الآن. عد لاحقًا أو اضغط تحديث.",
-  "Tap to continue — finish it before claiming another":"اضغط للمتابعة — أنهِه قبل استلام طلب آخر",
-  "Enable location":"تفعيل الموقع","No trips yet":"لا توجد رحلات بعد","Claim a job from the Jobs tab to get started.":"استلم طلبًا من تبويب الطلبات للبدء.",
+  "Enable location":"تفعيل الموقع","Claim a job from the Jobs tab to get started.":"استلم طلبًا من تبويب الطلبات للبدء.",
+  // earnings + settlement
+  "Your Droply activity":"نشاطك على Droply",
+  "Commission from cash (COD) deliveries you collected":"عمولة من التوصيلات النقدية (الدفع عند الاستلام) التي حصّلتها",
+  "Transfer the amount via ATM or bank, then submit how much you sent with a receipt. We'll verify and reduce your balance.":"حوّل المبلغ عبر الصراف الآلي أو البنك، ثم أرسل المبلغ الذي حوّلته مع الإيصال. سنتحقق ونخصمه من رصيدك.",
+  "Droply keeps 50% of each delivery fee. On cash orders you collect the full fee and transfer our share; on online orders we pay your share directly.":"تحتفظ Droply بـ 50% من رسوم كل توصيل. في الطلبات النقدية تحصّل الرسوم كاملة وتحوّل حصتنا؛ وفي الطلبات الأونلاين ندفع حصتك مباشرة.",
+  "Bank / transfer reference (optional)":"مرجع البنك / التحويل (اختياري)",
+  "Transfer receipt":"إيصال التحويل","Tap to upload a photo or PDF":"اضغط لرفع صورة أو PDF","receipt":"إيصال",
+  "e.g. transfer no. / ATM ref":"مثال: رقم التحويل / مرجع الصراف",
+  "Delivered":"تم التوصيل","No deliveries yet":"لا توجد توصيلات بعد","Complete a delivery to earn.":"أكمل توصيلة لتبدأ الكسب.",
+  "Dropoff":"تسليم","Pickup":"الاستلام",
 };
 // dynamic-string patterns (numbers/names kept as-is)
 const PAT = [
@@ -527,11 +536,15 @@ const PAT = [
   [/^You earned (.+?) · you owe Droply (.+)$/, m=>`ربحت ${m[1]} · وعليك ${m[2]} لـ Droply`],
   [/^You earned (.+)$/, m=>`ربحت ${m[1]}`],
   [/^Claim this job · (.+)$/, m=>`استلام هذا الطلب · ${m[1]}`],
-  [/^Post delivery · (.+)$/, m=>`انشر الطلب · ${m[1]}`],
+  [/^Post delivery · (.+)$/, m=>`تأكيد الطلب · ${m[1]}`],
   [/^No jobs within (\d+) km$/, m=>`لا توجد طلبات ضمن ${m[1]} كم`],
   [/^(\d+) drop-offs? · Same city \((.+)\)$/, m=>`${m[1]} تسليم · نفس المدينة (${m[2]})`],
+  [/^Dropoff · (.+)$/, m=>`تسليم · ${m[1]}`],
+  [/^Drop (\d+) · (.+)$/, m=>`تسليم ${m[1]} · ${m[2]}`],
   [/^You: (.+)$/, m=>`أنت: ${m[1]}`],
   [/^Showing pickups within (\d+) km, nearest first\.$/, m=>`عرض الطلبات ضمن ${m[1]} كم، الأقرب أولاً.`],
+  [/^You owe (.+?)\. Send it via ATM or bank transfer, then submit the details below — we'll verify and update your balance\.$/,
+    m=>`عليك ${m[1]}. حوّلها عبر الصراف الآلي أو البنك، ثم أرسل التفاصيل أدناه — سنتحقق ونحدّث رصيدك.`],
 ];
 function trPhrase(s){
   if(AR[s]) return AR[s];
