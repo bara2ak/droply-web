@@ -399,6 +399,24 @@ async function loadDiscounts(){
     if(data) DISCOUNTS=data.map(d=>({code:d.code,type:d.type,value:Number(d.value),active:d.active})); }catch(_){}
 }
 async function refreshAndRender(){ await loadDeliveries(); render(); }
+
+/* ---- live delivery updates (Supabase Realtime) ---- */
+let delChannel=null, delTimer=null;
+function subscribeDeliveries(){
+  if(delChannel){ sb.removeChannel(delChannel); delChannel=null; }
+  const u=currentUser(); if(!u)return;
+  delChannel=sb.channel('deliveries-'+u.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'deliveries'}, ()=>onDeliveryChange())
+    .subscribe();
+}
+function onDeliveryChange(){
+  // debounce, and only refresh on screens that show delivery data (never mid-form)
+  clearTimeout(delTimer);
+  delTimer=setTimeout(()=>{
+    if(role==='customer' && (screen==='track' || (tab==='home'&&screen==='main'))) refreshAndRender();
+    else if(role==='driver' && (screen==='jobDetail' || (screen==='main'&&(tab==='home'||tab==='trips')))) refreshAndRender();
+  }, 400);
+}
 let draft={fromCity:'Amman',pickAddr:'',pickCoords:'',toCity:'Amman',multi:false,bags:[{recipient:'',addr:'',mobile:''}],size:'medium',notes:'',code:'',discountObj:null,paymentMethod:'cod'};
 
 /* ---------------- HELPERS ---------------- */
@@ -494,10 +512,11 @@ function chooseRole(r){
 }
 function resetDocs(){ docs={id:null,license:null,record:null}; }
 function backToPicker(){ show('picker'); }
-async function logout(){ if(notifChannel){sb.removeChannel(notifChannel);notifChannel=null;} await sb.auth.signOut();
-  driver=null; customerUser=null; role=null; verifyEmail=null; notifications=[]; show('picker'); }
+async function logout(){ if(notifChannel){sb.removeChannel(notifChannel);notifChannel=null;}
+  if(delChannel){sb.removeChannel(delChannel);delChannel=null;} await sb.auth.signOut();
+  driver=null; customerUser=null; role=null; verifyEmail=null; notifications=[]; deliveries=[]; show('picker'); }
 function enterApp(){ tab='home'; screen='main'; resetDocs(); show('app'); render(); loadNotifications(); pushOnEnter();
-  loadDiscounts(); refreshAndRender(); }
+  loadDiscounts(); refreshAndRender(); subscribeDeliveries(); }
 
 function renderAuth(){
   const v=$('authView');
