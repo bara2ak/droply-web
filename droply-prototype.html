@@ -939,8 +939,8 @@ function renderDriver(){
   if(tab==='trips') return driverTrips();
   return driverJobs();
 }
-function myJobs(){return deliveries.filter(d=>d.driver&&d.driver.email===driver.email);}
-function myActiveJob(){return deliveries.find(d=>d.driver&&d.driver.email===driver.email&&d.status!=='delivered');}
+function myJobs(){return deliveries.filter(d=>d.captainId===driver.id);}
+function myActiveJob(){return deliveries.find(d=>d.captainId===driver.id&&d.status!=='delivered');}
 function parseCoords(s){const m=(s||'').match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/);return m?[parseFloat(m[1]),parseFloat(m[2])]:null;}
 function haversine(a,b){const R=6371,rad=x=>x*Math.PI/180;
   const dLa=rad(b[0]-a[0]),dLo=rad(b[1]-a[1]);
@@ -1036,7 +1036,7 @@ function driverJobs(){
 }
 function driverJob(){
   const d=deliveries.find(x=>x.id===selected); if(!d)return driverJobs();
-  const mine=d.driver&&d.driver.email===driver.email;
+  const mine=d.captainId===driver.id;
   const n=bagCount(d);
   let h=`<button class="back" onclick="back()">‹ Back</button>
     <div class="between"><h1>Job #${d.id}</h1>${pill(d.status)}</div>
@@ -1052,7 +1052,10 @@ function driverJob(){
       ${d.bags.map((b,i)=>`<div style="padding:11px 0;${i<n-1?'border-bottom:1px solid var(--line)':''}">
         <b>${n>1?(i+1)+'. ':''}${esc(b.recipient)}</b>
         <a href="${navUrl(b.addr)}" target="_blank" rel="noopener" style="display:block;font-size:13px;color:var(--brand);font-weight:600;margin-top:2px;text-decoration:none">🧭 ${esc(b.addr)}</a>
-        <a href="tel:${esc(b.mobile)}" style="display:inline-block;font-size:13px;margin-top:4px;color:var(--ink);text-decoration:none">📞 ${esc(b.mobile)}</a></div>`).join('')}
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <a class="btn ghost sm" href="${telHref(b.mobile)}" style="flex:1;text-align:center;text-decoration:none;padding:9px">📞 Call</a>
+          <a class="btn sm" href="${waHref(b.mobile)}" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none;padding:9px;background:#25D366">💬 WhatsApp</a>
+        </div></div>`).join('')}
       ${d.notes?`<div style="margin-top:8px;font-size:13px;color:var(--muted)">📝 ${esc(d.notes)}</div>`:''}</div>`;
   if(mine){
     const cod=(d.paymentMethod||'cod')==='cod';
