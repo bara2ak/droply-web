@@ -163,7 +163,7 @@ function render(){
   const pend=captains.filter(c=>c.status==='pending').length;
   const pendS=settlements.filter(s=>s.status==='pending').length;
   const items=[['dashboard','▤','Dashboard'],['captains','🚗','Captains',pend],['customers','🙂','Customers'],['deliveries','📦','Deliveries'],
-    ['discounts','🏷️','Discounts'],['settlements','🏦','Settlements',pendS],['announce','📢','Announcements'],['team','👥','Team']];
+    ['discounts','🏷️','Discounts'],['settlements','🏦','Settlements',pendS],['reports','📊','Reports'],['announce','📢','Announcements'],['team','👥','Team']];
   $('nav').innerHTML=items.map(([r,i,l,b])=>`<a class="${route===r?'on':''}" onclick="go('${r}')">${i} ${l}${b?`<span class="badge">${b}</span>`:''}</a>`).join('');
   const m=$('main');
   if(route==='dashboard') m.innerHTML=viewDashboard();
@@ -172,6 +172,7 @@ function render(){
   else if(route==='deliveries') m.innerHTML=viewDeliveries();
   else if(route==='discounts') m.innerHTML=viewDiscounts();
   else if(route==='settlements') m.innerHTML=viewSettlements();
+  else if(route==='reports') m.innerHTML=viewReports();
   else if(route==='announce') m.innerHTML=viewAnnounce();
   else if(route==='team') m.innerHTML=viewTeam();
 }
@@ -354,6 +355,130 @@ async function approveSettlement(id,capId,amount){
   await loadAll();render();toast('Approved — balance updated');
 }
 async function rejectSettlement(id){ if(!confirm('Reject this transfer?'))return; await sb.from('settlements').update({status:'rejected'}).eq('id',id); await loadAll();render();toast('Rejected'); }
+
+/* ---------- REPORTS ---------- */
+let rpFrom='', rpTo='', rpPreset='all';
+function dstr(d){ return new Date(d).toISOString().slice(0,10); }
+function applyPreset(p){
+  rpPreset=p; const today=new Date();
+  const iso=d=>d.toISOString().slice(0,10);
+  if(p==='today'){ rpFrom=rpTo=iso(today); }
+  else if(p==='7'){ const s=new Date(today); s.setDate(s.getDate()-6); rpFrom=iso(s); rpTo=iso(today); }
+  else if(p==='30'){ const s=new Date(today); s.setDate(s.getDate()-29); rpFrom=iso(s); rpTo=iso(today); }
+  else if(p==='month'){ rpFrom=iso(new Date(today.getFullYear(),today.getMonth(),1)); rpTo=iso(today); }
+  else { rpFrom=''; rpTo=''; }   // all time
+  render();
+}
+function inRange(ts){
+  if(!ts) return false;
+  const d=dstr(ts);
+  if(rpFrom && d<rpFrom) return false;
+  if(rpTo && d>rpTo) return false;
+  return true;
+}
+function rpData(){
+  const dels=deliveries.filter(d=>inRange(d.created_at));
+  const caps=captains.filter(c=>inRange(c.joined));
+  const custs=customers.filter(c=>inRange(c.created_at));
+  const delivered=dels.filter(d=>d.status==='delivered');
+  const revenue=delivered.reduce((s,d)=>s+Number(d.price||0),0);
+  const commission=revenue*0.5;
+  return {dels,caps,custs,delivered,revenue,commission,
+    cancelled:dels.filter(d=>d.status==='cancelled').length,
+    active:dels.filter(d=>['pending','assigned','transit'].includes(d.status)).length};
+}
+function viewReports(){
+  const r=rpData();
+  const label = (!rpFrom&&!rpTo) ? 'All time' : `${rpFrom||'…'} → ${rpTo||'…'}`;
+  const kpi=(l,v,d)=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${d?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${d}</div>`:''}</div>`;
+  const presetBtn=(k,t)=>`<button class="mini ${rpPreset===k?'b':''}" style="${rpPreset===k?'border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)':''}" onclick="applyPreset('${k}')">${t}</button>`;
+  // per-day breakdown
+  const byDay={};
+  r.dels.forEach(d=>{ const k=dstr(d.created_at); byDay[k]=byDay[k]||{n:0,rev:0,done:0};
+    byDay[k].n++; if(d.status==='delivered'){byDay[k].done++; byDay[k].rev+=Number(d.price||0);} });
+  const days=Object.keys(byDay).sort().reverse();
+  const dayRows=days.map(k=>`<tr><td>${k}</td><td>${byDay[k].n}</td><td>${byDay[k].done}</td><td>${jod(byDay[k].rev)}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="4">No deliveries in this period</td></tr>`;
+  // top captains
+  const byCap={};
+  r.delivered.forEach(d=>{ if(!d.captain_id)return; byCap[d.captain_id]=byCap[d.captain_id]||{n:0,rev:0};
+    byCap[d.captain_id].n++; byCap[d.captain_id].rev+=Number(d.price||0); });
+  const topCaps=Object.entries(byCap).sort((a,b)=>b[1].n-a[1].n).slice(0,10);
+  const capRows=topCaps.map(([id,v])=>{ const c=captains.find(x=>x.id===id);
+    return `<tr><td>${esc(c?c.name:'—')}</td><td>${v.n}</td><td>${jod(v.rev)}</td></tr>`;}).join('')
+    || `<tr><td class="empty" colspan="3">No completed deliveries in this period</td></tr>`;
+  return `<div class="head"><div><h1>Reports</h1><div class="sub">${label}</div></div>
+    <button class="btn sm outline" onclick="reload()">↻ Refresh</button></div>
+    <div class="card">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        ${presetBtn('all','All time')}${presetBtn('today','Today')}${presetBtn('7','Last 7 days')}${presetBtn('30','Last 30 days')}${presetBtn('month','This month')}
+      </div>
+      <div class="two">
+        <div><label>From</label><input type="date" id="rp_from" value="${rpFrom}" onchange="rpFrom=this.value;rpPreset='custom';render()"></div>
+        <div><label>To</label><input type="date" id="rp_to" value="${rpTo}" onchange="rpTo=this.value;rpPreset='custom';render()"></div>
+      </div>
+    </div>
+    <div class="kpis">
+      ${kpi('📦 Deliveries',r.dels.length,`${r.delivered.length} delivered · ${r.active} active · ${r.cancelled} cancelled`)}
+      ${kpi('💰 Revenue',jod(r.revenue),'From delivered orders')}
+      ${kpi('🏦 Droply share',jod(r.commission),'50% commission')}
+      ${kpi('🚗 New captains',r.caps.length,'Registered in period')}
+    </div>
+    <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+      ${kpi('🙂 New customers',r.custs.length,'Registered in period')}
+      ${kpi('✅ Completion rate',r.dels.length?Math.round(r.delivered.length/r.dels.length*100)+'%':'—','Delivered / total')}
+      ${kpi('📈 Avg order',r.delivered.length?jod(r.revenue/r.delivered.length):'—','Per delivered order')}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 18px">
+      <button class="btn sm" onclick="exportCsv('deliveries')">⬇ Export deliveries CSV</button>
+      <button class="btn sm outline" onclick="exportCsv('captains')">⬇ Export captains CSV</button>
+      <button class="btn sm outline" onclick="exportCsv('customers')">⬇ Export customers CSV</button>
+      <button class="btn sm outline" onclick="exportCsv('daily')">⬇ Export daily summary CSV</button>
+    </div>
+    <div class="grid2" style="align-items:start">
+      <div class="panel"><div class="ph">Daily breakdown</div>
+        <table><thead><tr><th>Date</th><th>Orders</th><th>Delivered</th><th>Revenue</th></tr></thead><tbody>${dayRows}</tbody></table></div>
+      <div class="panel"><div class="ph">Top captains</div>
+        <table><thead><tr><th>Captain</th><th>Delivered</th><th>Revenue</th></tr></thead><tbody>${capRows}</tbody></table></div>
+    </div>`;
+}
+function csvCell(v){ const s=(v==null?'':String(v)).replace(/"/g,'""'); return `"${s}"`; }
+function downloadCsv(name,rows){
+  const csv=rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=name+'_'+(rpFrom||'all')+'_'+(rpTo||'all')+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  toast('CSV downloaded');
+}
+function exportCsv(kind){
+  const r=rpData();
+  if(kind==='deliveries'){
+    const rows=[['ID','Created','Customer','Recipients','From city','To city','Pickup address','Captain','Price (JOD)','Payment','Status','Discount']];
+    r.dels.forEach(d=>{
+      const recips=((d.delivery_bags||[]).map(b=>b.recipient).filter(Boolean)).join(' | ');
+      const cap=d.captains&&d.captains.profiles?d.captains.profiles.full_name:'';
+      rows.push([d.id, dstr(d.created_at), d.customer?d.customer.full_name:'', recips, d.from_city, d.to_city,
+        d.pickup_addr||'', cap, Number(d.price||0), d.payment_method||'', d.status, d.discount_code||'']);
+    });
+    downloadCsv('deliveries',rows);
+  } else if(kind==='captains'){
+    const rows=[['Name','Email','Mobile','City','Vehicle','Plate','Status','Earnings (JOD)','Owed (JOD)','Joined']];
+    r.caps.forEach(c=>rows.push([c.name,c.email,c.mobile,c.city,c.vehicle,c.plate||'',c.status,c.earnings,c.owed,c.joined?dstr(c.joined):'']));
+    downloadCsv('captains',rows);
+  } else if(kind==='customers'){
+    const rows=[['Name','Email','Mobile','City','Joined']];
+    r.custs.forEach(c=>rows.push([c.full_name,c.email,c.mobile||'',c.city||'',c.created_at?dstr(c.created_at):'']));
+    downloadCsv('customers',rows);
+  } else {
+    const byDay={};
+    r.dels.forEach(d=>{ const k=dstr(d.created_at); byDay[k]=byDay[k]||{n:0,done:0,rev:0};
+      byDay[k].n++; if(d.status==='delivered'){byDay[k].done++; byDay[k].rev+=Number(d.price||0);} });
+    const rows=[['Date','Orders','Delivered','Revenue (JOD)','Droply share (JOD)']];
+    Object.keys(byDay).sort().forEach(k=>rows.push([k,byDay[k].n,byDay[k].done,byDay[k].rev,byDay[k].rev*0.5]));
+    downloadCsv('daily_summary',rows);
+  }
+}
 
 /* ---------- ANNOUNCEMENTS ---------- */
 let anAud='all';
