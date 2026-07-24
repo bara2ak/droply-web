@@ -349,7 +349,7 @@
 const sb = supabase.createClient(window.DROPLY_SUPABASE_URL, window.DROPLY_SUPABASE_ANON_KEY);
 
 /* ---------------- STATE ---------------- */
-let role=null, tab='home', screen='main', selected=null, authMode='login';
+let role=null, tab='home', screen='main', selected=null;
 let customerUser=null;   // {id,name,email,mobile,city,photo}
 let driver=null;         // {id,name,email,mobile,city,vehicle,plate,earnings,owed,verified,status}
 let docs={id:null,license:null,record:null};  // uploaded document filenames
@@ -491,6 +491,10 @@ const AR = {
   // role tag + common
   "Customer":"عميل","Captain":"كابتن","Back":"رجوع","‹ Back":"‹ رجوع","All deliveries":"كل الطلبات",
   "Your account has been suspended. Please contact support.":"تم إيقاف حسابك. يرجى التواصل مع الدعم.",
+  "Enter your phone number":"أدخل رقم جوالك","Continue":"متابعة","Change":"تغيير",
+  "We'll check if you already have an account.":"سنتحقق إن كان لديك حساب بالفعل.",
+  "Choose a password":"اختر كلمة مرور","Checking…":"جارٍ التحقق…","Wrong password":"كلمة المرور غير صحيحة",
+  "Enter a valid mobile number":"أدخل رقم جوال صحيح","Enter your password":"أدخل كلمة المرور",
   // extra strings
   "Live tracking starts as soon as a captain accepts your delivery.":"يبدأ التتبّع المباشر فور قبول كابتن لطلبك.",
   "This delivery was cancelled and is no longer active.":"تم إلغاء هذا الطلب ولم يعد نشطًا.",
@@ -671,7 +675,8 @@ function currentUser(){return role==='driver'?driver:customerUser;}
 function show(el){['picker','authScreen','app'].forEach(i=>$(i).style.display='none');
   $(el).style.display = el==='picker'?'flex':'flex';}
 function chooseRole(r){
-  role=r; tab='home'; screen='main'; authMode='login'; verifyEmail=null; resetDocs();
+  role=r; tab='home'; screen='main'; verifyEmail=null; resetDocs();
+  authStep='phone'; authPhone=''; authEmail='';
   const loggedIn = r==='driver'?driver:customerUser;
   if(loggedIn){ show('app'); render(); pushOnEnter(); } else { show('authScreen'); renderAuth(); }
 }
@@ -683,31 +688,65 @@ async function logout(){ if(notifChannel){sb.removeChannel(notifChannel);notifCh
 function enterApp(){ tab='home'; screen='main'; resetDocs(); show('app'); render(); loadNotifications(); pushOnEnter();
   loadDiscounts(); refreshAndRender(); subscribeDeliveries(); }
 
+/* ---- phone-first auth: one page. Enter phone → log in, or register. ---- */
+let authStep='phone';      // 'phone' | 'login' | 'signup'
+let authPhone='';          // normalised 962…
+let authEmail='';          // login email resolved from the phone
+function phoneEmail(p){ return normJo(p)+'@droply.app'; }   // synthetic login for new accounts
+function prettyPhone(p){ return '+'+normJo(p); }
+
 function renderAuth(){
   const v=$('authView');
   if(verifyEmail){ v.innerHTML=verifyScreen(); translateAll(); return; }
   const isDriver=role==='driver';
-  const su=authMode==='signup';
   const head=`
     <div class="hero"><span class="dot">▸</span></div>
-    <h1>${su?'Create your account':'Welcome back'}</h1>
-    <p class="sub">${isDriver?'Captain account':'Customer account'} · Droply</p>
-    <div class="tabs">
-      <button class="${!su?'on':''}" onclick="authMode='login';resetDocs();renderAuth()">Log in</button>
-      <button class="${su?'on':''}" onclick="authMode='signup';resetDocs();renderAuth()">Sign up</button>
-    </div>`;
-  if(su && isDriver){ v.innerHTML=head+driverSignupForm(); translateAll(); return; }
+    <h1>${authStep==='signup'?'Create your account':authStep==='login'?'Welcome back':'Enter your phone number'}</h1>
+    <p class="sub">${isDriver?'Captain account':'Customer account'} · Droply</p>`;
+
+  if(authStep==='phone'){
+    v.innerHTML=head+`
+      <label>Mobile number</label>
+      <input id="a_phone" type="tel" inputmode="numeric" placeholder="07 9000 0000" value="${esc(authPhone)}">
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0">We'll check if you already have an account.</p>
+      <div style="height:18px"></div>
+      <button class="btn" onclick="continuePhone()">Continue</button>`;
+    translateAll(); return;
+  }
+  if(authStep==='login'){
+    v.innerHTML=head+`
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between">
+        <b>${esc(prettyPhone(authPhone))}</b>
+        <a onclick="authStep='phone';renderAuth()" style="color:var(--brand);font-weight:700;cursor:pointer;font-size:13px">Change</a></div>
+      <label>Password</label><input id="a_pass" type="password" placeholder="••••••">
+      <div style="height:18px"></div>
+      <button class="btn" onclick="submitAuth()">Log in</button>`;
+    translateAll(); return;
+  }
+  // signup
+  if(isDriver){ v.innerHTML=head+driverSignupForm(); translateAll(); return; }
   v.innerHTML=head+`
-    ${su?`<label>Full name</label><input id="a_name" placeholder="Your name">
-    <label>Mobile number</label><input id="a_mobile" type="tel" placeholder="+962 7 0000 0000">
-    <label>City</label><select id="a_city">${JO_CITIES.map(c=>`<option>${c}</option>`).join('')}</select>`:''}
-    <label>Email</label><input id="a_email" type="email" placeholder="you@email.com">
-    <label>Password</label><input id="a_pass" type="password" placeholder="••••••">
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between">
+      <b>${esc(prettyPhone(authPhone))}</b>
+      <a onclick="authStep='phone';renderAuth()" style="color:var(--brand);font-weight:700;cursor:pointer;font-size:13px">Change</a></div>
+    <label>Full name</label><input id="a_name" placeholder="Your name">
+    <label>City</label><select id="a_city">${JO_CITIES.map(c=>`<option>${c}</option>`).join('')}</select>
+    <label>Password</label><input id="a_pass" type="password" placeholder="Choose a password">
     <div style="height:18px"></div>
-    <button class="btn" onclick="submitAuth()">${su?'Create account':'Log in'}</button>
-    <div class="demo">${su?'Already have an account? ':'New to Droply? '}
-      <a onclick="authMode='${su?'login':'signup'}';resetDocs();renderAuth()">${su?'Log in':'Create one'}</a></div>`;
+    <button class="btn" onclick="submitAuth()">Create account</button>`;
   translateAll();
+}
+async function continuePhone(){
+  const raw=($('a_phone').value||'').trim();
+  if(raw.replace(/\D/g,'').length<7){toast('Enter a valid mobile number');return;}
+  authPhone=normJo(raw);
+  toast('Checking…');
+  try{
+    const {data}=await sb.rpc('phone_lookup',{p_phone:authPhone});
+    if(data){ authEmail=data; authStep='login'; }
+    else { authEmail=phoneEmail(authPhone); authStep='signup'; resetDocs(); }
+  }catch(e){ authEmail=phoneEmail(authPhone); authStep='signup'; }
+  renderAuth();
 }
 function uplTile(key,ic,title,accept){
   const done=!!docs[key];
@@ -720,11 +759,12 @@ function uplTile(key,ic,title,accept){
 }
 function driverSignupForm(){
   return `
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between">
+      <b>${esc(prettyPhone(authPhone))}</b>
+      <a onclick="authStep='phone';renderAuth()" style="color:var(--brand);font-weight:700;cursor:pointer;font-size:13px">Change</a></div>
     <div class="two"><div><label>First name</label><input id="a_first" placeholder="First"></div>
       <div><label>Last name</label><input id="a_last" placeholder="Last"></div></div>
-    <label>Mobile number</label><input id="a_mobile" type="tel" placeholder="+962 7 0000 0000">
-    <label>Email</label><input id="a_email" type="email" placeholder="you@email.com">
-    <label>Password</label><input id="a_pass" type="password" placeholder="••••••">
+    <label>Password</label><input id="a_pass" type="password" placeholder="Choose a password">
     <label>City</label>
     <select id="a_city"><option value="" disabled selected>Select your city</option>
       ${JO_CITIES.map(c=>`<option>${c}</option>`).join('')}</select>
@@ -736,8 +776,7 @@ function driverSignupForm(){
     ${uplTile('license','🚗','Driving license','image/*')}
     ${uplTile('record','📄','Proof of no criminal record','image/*,application/pdf')}
     <div class="note">🔒 Your documents are used only to verify your identity and are reviewed before your account is approved. In production this takes 24–48 hours.</div>
-    <button class="btn" onclick="submitAuth()">Submit for verification</button>
-    <div class="demo">Already have an account? <a onclick="authMode='login';resetDocs();renderAuth()">Log in</a></div>`;
+    <button class="btn" onclick="submitAuth()">Submit for verification</button>`;
 }
 let docFiles={id:null,license:null,record:null};   // actual File objects to upload
 function markUpload(key,input){
@@ -782,55 +821,52 @@ async function checkApproval(){
   if(cap && cap.status==='verified'){ verifyEmail=null; await loadProfileAndRoute(); toast('You are verified — welcome aboard!'); }
   else toast('Still under review — an admin will approve you soon.');
 }
-async function verifyBack(){ await sb.auth.signOut(); verifyEmail=null; authMode='login'; renderAuth(); }
+async function verifyBack(){ await sb.auth.signOut(); verifyEmail=null; authStep='phone'; renderAuth(); }
 async function submitAuth(){
   const isDriver=role==='driver';
-  const su=authMode==='signup';
-  const email=($('a_email').value||'').trim().toLowerCase();
+  const su=authStep==='signup';
   const pass=$('a_pass').value||'';
+  const mobile=prettyPhone(authPhone);
   try{
     // ----- Captain sign-up -----
     if(su && isDriver){
       const first=($('a_first').value||'').trim(), last=($('a_last').value||'').trim();
-      const mobile=($('a_mobile').value||'').trim();
       const city=$('a_city').value;
       if(!first||!last){toast('Enter your first and last name');return;}
-      if(!mobile){toast('Enter your mobile number');return;}
-      if(!email||!pass){toast('Enter email and password');return;}
+      if(!pass){toast('Choose a password');return;}
       if(!city){toast('Select your city');return;}
       if(!docs.id||!docs.license||!docs.record){toast('Upload all three documents');return;}
       toast('Creating your account…');
-      const {data,error}=await sb.auth.signUp({email,password:pass});
+      const {data,error}=await sb.auth.signUp({email:authEmail,password:pass});
       if(error){toast(error.message);return;}
       const uid=data.user.id;
-      await sb.from('profiles').insert({id:uid,role:'captain',full_name:first+' '+last,email,mobile,city});
+      await sb.from('profiles').insert({id:uid,role:'captain',full_name:first+' '+last,email:authEmail,mobile,city});
       await sb.from('captains').insert({id:uid,vehicle:$('a_veh').value,plate:($('a_plate').value||'').trim()||null,
         status:'pending'});
       const paths=await uploadKyc(uid);
       await sb.from('captains').update({id_doc_url:paths.id,license_url:paths.license,record_url:paths.record}).eq('id',uid);
-      verifyEmail=email; renderAuth();
+      verifyEmail=authEmail; renderAuth();
       return;
     }
-    if(!email||!pass){toast('Enter email and password');return;}
     // ----- Customer sign-up -----
     if(su){
       const name=($('a_name').value||'').trim();
-      const mobile=($('a_mobile').value||'').trim();
       const city=$('a_city').value;
       if(!name){toast('Enter your name');return;}
-      if(!mobile){toast('Enter your mobile number');return;}
+      if(!pass){toast('Choose a password');return;}
       toast('Creating your account…');
-      const {data,error}=await sb.auth.signUp({email,password:pass});
+      const {data,error}=await sb.auth.signUp({email:authEmail,password:pass});
       if(error){toast(error.message);return;}
-      await sb.from('profiles').insert({id:data.user.id,role:'customer',full_name:name,email,mobile,city});
+      await sb.from('profiles').insert({id:data.user.id,role:'customer',full_name:name,email:authEmail,mobile,city});
       await loadProfileAndRoute();
       toast('Welcome to Droply, '+name.split(' ')[0]+'!');
     }
-    // ----- Log in (either role) -----
+    // ----- Log in -----
     else {
+      if(!pass){toast('Enter your password');return;}
       toast('Signing in…');
-      const {error}=await sb.auth.signInWithPassword({email,password:pass});
-      if(error){toast('Wrong email or password');return;}
+      const {error}=await sb.auth.signInWithPassword({email:authEmail,password:pass});
+      if(error){toast('Wrong password');return;}
       await loadProfileAndRoute();
     }
   }catch(err){ toast('Something went wrong: '+(err.message||err)); }
