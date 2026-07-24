@@ -147,7 +147,9 @@ async function loadAll(){
   ]);
   captains=(cap.data||[]).map(c=>({id:c.id, name:c.profiles?.full_name||'—', email:c.profiles?.email||'',
     mobile:c.profiles?.mobile||'', city:c.profiles?.city||'', vehicle:c.vehicle, plate:c.plate,
-    status:c.status, owed:Number(c.owed||0), earnings:Number(c.earnings||0)}));
+    status:c.status, owed:Number(c.owed||0), earnings:Number(c.earnings||0),
+    joined:c.profiles?.created_at||c.created_at,
+    docs:{id:c.id_doc_url,license:c.license_url,record:c.record_url}}));
   customers=(cus.data||[]);
   discounts=(dis.data||[]);
   settlements=(set.data||[]);
@@ -202,6 +204,7 @@ function viewCaptains(){
       ${c.status==='pending'?`<button class="mini g" onclick="setCaptain('${c.id}','verified')">Approve</button><button class="mini r" onclick="setCaptain('${c.id}','suspended')">Reject</button>`:''}
       ${c.status==='verified'?`<button class="mini r" onclick="setCaptain('${c.id}','suspended')">Suspend</button>`:''}
       ${c.status==='suspended'?`<button class="mini g" onclick="setCaptain('${c.id}','verified')">Reinstate</button>`:''}
+      <button class="mini b" onclick="viewCaptain('${c.id}')">View</button>
       <button class="mini b" onclick="openCaptain('${c.id}')">Edit</button>
     </td></tr>`).join('') || `<tr><td class="empty" colspan="7">No captains yet. When someone signs up as a captain in the app, they appear here.</td></tr>`;
   return `<div class="head"><div><h1>Captains</h1><div class="sub">${captains.length} registered · ${captains.filter(c=>c.status==='pending').length} awaiting approval</div></div>
@@ -385,6 +388,48 @@ function fieldRow(id,label,val,type){return `<label>${label}</label><input id="$
 function citySelect(id,val){return `<label>City</label><select id="${id}">${CITIES.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</select>`;}
 
 /* ---------- EDIT CAPTAIN ---------- */
+/* ---------- VIEW CAPTAIN (details + KYC documents) ---------- */
+function viewCaptain(id){
+  const c=captains.find(x=>x.id===id); if(!c)return;
+  const row=(k,v)=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)">
+    <span style="color:var(--muted)">${k}</span><b>${esc(v||'—')}</b></div>`;
+  const docTile=(key,icon,label)=>{
+    const p=c.docs&&c.docs[key];
+    return `<div class="kpi" style="text-align:center;padding:14px">
+      <div style="font-size:30px">${icon}</div>
+      <div style="font-weight:700;font-size:12.5px;margin-top:4px">${label}</div>
+      ${p?`<button class="mini b" style="margin-top:8px" onclick="openDoc('${esc(p)}')">Open</button>`
+         :`<div style="font-size:11.5px;color:var(--muted);margin-top:8px">Not uploaded</div>`}</div>`;
+  };
+  openModal(`<div class="mh"><h3>${esc(c.name)}</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb">
+      <div style="margin-bottom:6px">${c.status==='verified'?'<span class="pill p-verified">Verified</span>':c.status==='pending'?'<span class="pill p-pending">Pending</span>':'<span class="pill p-suspended">Suspended</span>'}</div>
+      ${row('Email',c.email)}${row('Mobile',c.mobile)}${row('City',c.city)}
+      ${row('Vehicle',c.vehicle)}${row('Plate',c.plate)}
+      ${row('Earnings',jod(c.earnings))}${row('Owed to Droply',jod(c.owed))}
+      ${row('Joined',c.joined?new Date(c.joined).toISOString().slice(0,10):'—')}
+      <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;margin:16px 0 8px">Verification documents</div>
+      <div class="kpis" style="grid-template-columns:repeat(3,1fr);margin:0">
+        ${docTile('id','🪪','Government ID')}
+        ${docTile('license','🚗','Driving license')}
+        ${docTile('record','📄','No-criminal record')}
+      </div>
+    </div>
+    <div class="mf">
+      ${c.status==='pending'?`<button class="mini g" onclick="setCaptain('${c.id}','verified');closeModal()">Approve</button>
+        <button class="mini r" onclick="setCaptain('${c.id}','suspended');closeModal()">Reject</button>`:''}
+      <button class="btn outline" onclick="closeModal()">Close</button>
+    </div>`);
+}
+// create a temporary signed link for a private KYC file and open it
+async function openDoc(path){
+  if(!path){toast('No file');return;}
+  if(/^https?:\/\//.test(path)){ window.open(path,'_blank'); return; }
+  const {data,error}=await sb.storage.from('kyc').createSignedUrl(path,300);
+  if(error||!data){ toast('Could not open file — it may have been uploaded before storage was enabled.'); return; }
+  window.open(data.signedUrl,'_blank');
+}
+
 function openCaptain(id){
   const c=captains.find(x=>x.id===id); if(!c)return;
   const parts=(c.name||'').split(' '); const fn=parts.shift()||''; const ln=parts.join(' ');

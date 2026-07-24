@@ -738,12 +738,25 @@ function driverSignupForm(){
     <button class="btn" onclick="submitAuth()">Submit for verification</button>
     <div class="demo">Already have an account? <a onclick="authMode='login';resetDocs();renderAuth()">Log in</a></div>`;
 }
+let docFiles={id:null,license:null,record:null};   // actual File objects to upload
 function markUpload(key,input){
   const f=input.files&&input.files[0]; if(!f)return;
-  docs[key]=f.name;
+  docs[key]=f.name; docFiles[key]=f;
   const tile=document.getElementById('tile_'+key);
   if(tile){tile.classList.add('done');
     tile.querySelector('.upl-status').textContent='✓ '+f.name;}
+}
+// upload the three KYC files to the private "kyc" bucket; returns their paths
+async function uploadKyc(uid){
+  const out={id:null,license:null,record:null};
+  for(const k of ['id','license','record']){
+    const f=docFiles[k]; if(!f) continue;
+    const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+    const path=`${uid}/${k}.${ext}`;
+    const {error}=await sb.storage.from('kyc').upload(path,f,{upsert:true});
+    out[k]= error? docs[k] : path;      // fall back to the filename if upload fails
+  }
+  return out;
 }
 function verifyScreen(){
   return `<div class="hero"><span class="dot">▸</span></div>
@@ -791,7 +804,9 @@ async function submitAuth(){
       const uid=data.user.id;
       await sb.from('profiles').insert({id:uid,role:'captain',full_name:first+' '+last,email,mobile,city});
       await sb.from('captains').insert({id:uid,vehicle:$('a_veh').value,plate:($('a_plate').value||'').trim()||null,
-        status:'pending',id_doc_url:docs.id,license_url:docs.license,record_url:docs.record});
+        status:'pending'});
+      const paths=await uploadKyc(uid);
+      await sb.from('captains').update({id_doc_url:paths.id,license_url:paths.license,record_url:paths.record}).eq('id',uid);
       verifyEmail=email; renderAuth();
       return;
     }
