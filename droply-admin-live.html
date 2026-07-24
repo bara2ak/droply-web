@@ -411,14 +411,40 @@ function viewSettlements(){
     statusVar:'fSetStatus',statusVal:fSetStatus,
     clear:"fSetQ='';fSetStatus='all'",count:`${list.length} of ${settlements.length}`});
   const rows=list.map(s=>`<tr>
+    <td>${s.created_at?new Date(s.created_at).toISOString().slice(0,10):'—'}</td>
     <td>${esc(capName(s.captain_id))}</td><td><b>${jod(s.amount)}</b></td><td>${esc(s.reference||'—')}</td>
     <td>${s.status==='pending'?'<span class="pill p-pending">Pending</span>':s.status==='approved'?'<span class="pill p-verified">Approved</span>':'<span class="pill p-suspended">Rejected</span>'}</td>
     <td>${s.status==='pending'?`<button class="mini g" onclick="approveSettlement('${s.id}','${s.captain_id}',${s.amount})">Approve</button><button class="mini r" onclick="rejectSettlement('${s.id}')">Reject</button>`:'—'}</td></tr>`).join('')
-    || `<tr><td class="empty" colspan="5">No settlements match your search.</td></tr>`;
-  return `<div class="head"><div><h1>Settlements</h1><div class="sub">${settlements.filter(s=>s.status==='pending').length} pending</div></div>
+    || `<tr><td class="empty" colspan="6">No settlements match your search.</td></tr>`;
+
+  // ----- Outstanding owed: captains who still owe Droply money -----
+  const owing=captains.filter(c=>Number(c.owed||0)>0).sort((a,b)=>b.owed-a.owed);
+  const owedTotal=owing.reduce((s,c)=>s+Number(c.owed||0),0);
+  const lastSettled=id=>{ const ss=settlements.filter(s=>s.captain_id===id&&s.status==='approved')
+      .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    return ss.length&&ss[0].created_at ? new Date(ss[0].created_at).toISOString().slice(0,10) : '—'; };
+  const pendingFor=id=>settlements.filter(s=>s.captain_id===id&&s.status==='pending')
+      .reduce((s,x)=>s+Number(x.amount||0),0);
+  const owingRows=owing.map(c=>{ const p=pendingFor(c.id);
+    return `<tr>
+      <td><div class="u"><div class="nm">${esc(c.name)}</div><div class="em">${esc(c.mobile||'')}</div></div></td>
+      <td>${esc(c.city||'—')}</td>
+      <td><b style="color:var(--amber)">${jod(c.owed)}</b></td>
+      <td>${p>0?`<span class="pill p-pending">${jod(p)} submitted</span>`:'—'}</td>
+      <td>${lastSettled(c.id)}</td>
+      <td><button class="mini b" onclick="viewCaptain('${c.id}')">View</button></td></tr>`;}).join('')
+    || `<tr><td class="empty" colspan="6">🎉 No outstanding balances — all captains are settled.</td></tr>`;
+
+  return `<div class="head"><div><h1>Settlements</h1><div class="sub">${settlements.filter(s=>s.status==='pending').length} pending · ${jod(owedTotal)} outstanding</div></div>
     <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
     ${bar}
-    <div class="panel"><table><thead><tr><th>Captain</th><th>Amount</th><th>Reference</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="panel" style="margin-bottom:24px"><div class="ph">Transfer submissions</div>
+      <table><thead><tr><th>Date</th><th>Captain</th><th>Amount</th><th>Reference</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
+
+    <div class="head" style="margin-bottom:12px"><div><h1 style="font-size:19px">Outstanding owed</h1>
+      <div class="sub">${owing.length} captain${owing.length===1?'':'s'} owe Droply · ${jod(owedTotal)} total</div></div></div>
+    <div class="panel"><table><thead><tr><th>Captain</th><th>City</th><th>Owed</th><th>Pending transfer</th><th>Last settled</th><th></th></tr></thead>
+      <tbody>${owingRows}</tbody></table></div>`;
 }
 async function approveSettlement(id,capId,amount){
   const cap=captains.find(c=>c.id===capId); const newOwed=Math.max(0,Math.round(((cap?cap.owed:0)-amount)*100)/100);
