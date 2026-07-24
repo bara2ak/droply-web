@@ -223,12 +223,16 @@ function viewCustomers(){
   const rows=customers.map(c=>`<tr>
     <td><div class="u"><div class="nm">${esc(c.full_name)}</div><div class="em">${esc(c.email)}</div></div></td>
     <td>${esc(c.mobile||'—')}</td><td>${esc(c.city||'—')}</td>
+    <td>${c.suspended?'<span class="pill p-suspended">Suspended</span>':'<span class="pill p-verified">Active</span>'}</td>
     <td>${new Date(c.created_at).toISOString().slice(0,10)}</td>
-    <td><button class="mini b" onclick="openCustomer('${c.id}')">Edit</button></td></tr>`).join('')
-    || `<tr><td class="empty" colspan="5">No customers yet.</td></tr>`;
-  return `<div class="head"><div><h1>Customers</h1><div class="sub">${customers.length} registered</div></div>
+    <td>
+      <button class="mini b" onclick="openCustomer('${c.id}')">Edit</button>
+      <button class="mini ${c.suspended?'g':'r'}" onclick="toggleCustomerSuspend('${c.id}',${!c.suspended})">${c.suspended?'Unsuspend':'Suspend'}</button>
+    </td></tr>`).join('')
+    || `<tr><td class="empty" colspan="6">No customers yet.</td></tr>`;
+  return `<div class="head"><div><h1>Customers</h1><div class="sub">${customers.length} registered · ${customers.filter(c=>c.suspended).length} suspended</div></div>
     <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
-    <div class="panel"><table><thead><tr><th>Customer</th><th>Mobile</th><th>City</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="panel"><table><thead><tr><th>Customer</th><th>Mobile</th><th>City</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ---------- DELIVERIES ---------- */
@@ -690,6 +694,13 @@ async function saveCaptain(id){
   const pass=($('e_pass').value||'').trim();
   if(pass){ if(pass.length<6){toast('Password must be 6+ characters');return;} if(!await setUserPassword(id,pass))return; }
   closeModal(); await loadAll(); render(); toast('Captain updated'+(pass?' · password changed':''));
+}
+
+async function toggleCustomerSuspend(id,suspend){
+  if(suspend && !confirm('Suspend this customer? They will not be able to use the app.'))return;
+  const {error}=await sb.from('profiles').update({suspended:suspend}).eq('id',id);
+  if(error){toast(error.message+' — did you run suspend.sql?');return;}
+  await loadAll(); render(); toast(suspend?'Customer suspended':'Customer reactivated');
 }
 
 /* ---------- EDIT CUSTOMER ---------- */

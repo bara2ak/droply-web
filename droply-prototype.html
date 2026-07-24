@@ -490,6 +490,7 @@ const AR = {
   "Notifications":"الإشعارات","No notifications yet":"لا توجد إشعارات بعد",
   // role tag + common
   "Customer":"عميل","Captain":"كابتن","Back":"رجوع","‹ Back":"‹ رجوع","All deliveries":"كل الطلبات",
+  "Your account has been suspended. Please contact support.":"تم إيقاف حسابك. يرجى التواصل مع الدعم.",
   // extra strings
   "Live tracking starts as soon as a captain accepts your delivery.":"يبدأ التتبّع المباشر فور قبول كابتن لطلبك.",
   "This delivery was cancelled and is no longer active.":"تم إلغاء هذا الطلب ولم يعد نشطًا.",
@@ -840,6 +841,10 @@ async function loadProfileAndRoute(){
   if(!user){ show('picker'); return; }
   const {data:prof,error}=await sb.from('profiles').select().eq('id',user.id).single();
   if(error||!prof){ toast('Could not load your profile'); return; }
+  if(prof.suspended){
+    await sb.auth.signOut(); role=null; customerUser=null; driver=null; verifyEmail=null;
+    show('picker'); toast('Your account has been suspended. Please contact support.'); return;
+  }
   if(prof.role==='captain'){
     role='driver';
     const {data:cap}=await sb.from('captains').select().eq('id',user.id).single();

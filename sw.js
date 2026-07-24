@@ -1,5 +1,5 @@
 // Droply service worker — makes the app installable and works offline-ish.
-const CACHE = 'droply-v24';
+const CACHE = 'droply-v25';
 const SHELL = [
   './droply-prototype.html',
   './droply-config.js',
