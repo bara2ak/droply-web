@@ -489,14 +489,69 @@ const AR = {
   // notifications
   "Notifications":"الإشعارات","No notifications yet":"لا توجد إشعارات بعد",
   // role tag + common
-  "Customer":"عميل","Captain":"كابتن","Back":"رجوع","‹ Back":"‹ رجوع",
+  "Customer":"عميل","Captain":"كابتن","Back":"رجوع","‹ Back":"‹ رجوع","All deliveries":"كل الطلبات",
+  // extra strings
+  "Live tracking starts as soon as a captain accepts your delivery.":"يبدأ التتبّع المباشر فور قبول كابتن لطلبك.",
+  "This delivery was cancelled and is no longer active.":"تم إلغاء هذا الطلب ولم يعد نشطًا.",
+  "Available jobs near you":"طلبات متاحة قريبة منك","Your active delivery":"طلبك النشط",
+  "Tap to continue — finish it before claiming another":"اضغط للمتابعة — أنهِه قبل استلام طلب آخر",
+  "Turn on location to find the delivery jobs closest to you.":"فعّل الموقع لإيجاد أقرب الطلبات إليك.",
+  "Refresh":"تحديث","Finish current delivery first":"أنهِ طلبك الحالي أولاً",
+  "Bag":"طرد","Bags":"طرود","Route":"المسار","JOD payout":"الأجرة (دينار)",
+  "Current location detected":"تم تحديد الموقع الحالي","Pinned on map":"محدد على الخريطة","Current location":"الموقع الحالي",
+  "Choose on map":"اختر على الخريطة","Use your GPS or drop a pin on the map — no typing needed.":"استخدم GPS أو ضع دبوسًا على الخريطة — دون كتابة.",
+  "One pickup, one captain — send to one or many people.":"استلام واحد، كابتن واحد — أرسل لشخص أو عدة أشخاص.",
+  "We don't transport anything illegal or prohibited. By posting, you confirm your items comply with the law.":"لا ننقل أي شيء غير قانوني أو ممنوع. بالنشر، أنت تؤكد أن أغراضك مطابقة للقانون.",
+  "Your documents are used only to verify your identity and are reviewed before your account is approved. In production this takes 24–48 hours.":"تُستخدم وثائقك فقط للتحقق من هويتك وتتم مراجعتها قبل الموافقة على حسابك. يستغرق ذلك عادة 24–48 ساعة.",
+  "Already have an account?":"لديك حساب بالفعل؟","New to Droply?":"جديد على Droply؟","Create one":"أنشئ حسابًا",
+  "Car":"سيارة","Motorcycle":"دراجة نارية","Set pickup location":"حدد موقع الاستلام","Set drop-off location":"حدد موقع التسليم","Confirm this location":"تأكيد هذا الموقع",
+  "Add another recipient":"إضافة مستلم آخر","✕ Remove":"✕ إزالة","Remove":"إزالة",
+  "Your net earnings":"صافي أرباحك","Delivered":"تم التوصيل","Active":"نشطة","Recent deliveries":"آخر التوصيلات","No deliveries yet":"لا توجد توصيلات بعد",
+  "Notes for captain (optional)":"ملاحظات للكابتن (اختياري)","Notes":"ملاحظات",
+  "You can cancel free until the captain picks up your package.":"يمكنك الإلغاء مجانًا حتى يستلم الكابتن طردك.",
+  "Captain updates status live as they go.":"يحدّث الكابتن الحالة مباشرة أثناء تنقّله.",
+  "No pickups near you right now. Check back soon or tap Refresh.":"لا توجد طلبات قريبة الآن. عد لاحقًا أو اضغط تحديث.",
+  "Tap to continue — finish it before claiming another":"اضغط للمتابعة — أنهِه قبل استلام طلب آخر",
+  "Enable location":"تفعيل الموقع","No trips yet":"لا توجد رحلات بعد","Claim a job from the Jobs tab to get started.":"استلم طلبًا من تبويب الطلبات للبدء.",
 };
+// dynamic-string patterns (numbers/names kept as-is)
+const PAT = [
+  [/^Hi, (.+) 👋$/, m=>`مرحبًا، ${m[1]} 👋`],
+  [/^Hi (.+) — track packages you've sent$/, m=>`مرحبًا ${m[1]} — تتبّع الطرود التي أرسلتها`],
+  [/^Job #(\d+) · (.+)$/, m=>`طلب #${m[1]} · ${AR[m[2]]||m[2]}`],
+  [/^Job #(\d+)$/, m=>`طلب #${m[1]}`],
+  [/^Delivery #(\d+)$/, m=>`طلب #${m[1]}`],
+  [/^Drop-offs \((\d+)\)( — contact & navigate)?$/, m=>`التسليمات (${m[1]})${m[2]?' — تواصل وتنقّل':''}`],
+  [/^Cash — collect (.+)$/, m=>`نقداً — حصّل ${m[1]}`],
+  [/^Collect (.+) cash from the recipient$/, m=>`حصّل ${m[1]} نقداً من المستلم`],
+  [/^You earned (.+?) · you owe Droply (.+)$/, m=>`ربحت ${m[1]} · وعليك ${m[2]} لـ Droply`],
+  [/^You earned (.+)$/, m=>`ربحت ${m[1]}`],
+  [/^Claim this job · (.+)$/, m=>`استلام هذا الطلب · ${m[1]}`],
+  [/^Post delivery · (.+)$/, m=>`انشر الطلب · ${m[1]}`],
+  [/^No jobs within (\d+) km$/, m=>`لا توجد طلبات ضمن ${m[1]} كم`],
+  [/^(\d+) drop-offs? · Same city \((.+)\)$/, m=>`${m[1]} تسليم · نفس المدينة (${m[2]})`],
+  [/^You: (.+)$/, m=>`أنت: ${m[1]}`],
+  [/^Showing pickups within (\d+) km, nearest first\.$/, m=>`عرض الطلبات ضمن ${m[1]} كم، الأقرب أولاً.`],
+];
+function trPhrase(s){
+  if(AR[s]) return AR[s];
+  for(const p of PAT){ const m=s.match(p[0]); if(m) return p[1](m); }
+  return null;
+}
 function translateNode(root){
   if(lang!=='ar'||!root) return;
   const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
   const list=[]; while(w.nextNode()) list.push(w.currentNode);
-  list.forEach(n=>{ const k=n.nodeValue.trim(); if(k && AR[k]) n.nodeValue = n.nodeValue.replace(k, AR[k]); });
-  root.querySelectorAll('[placeholder]').forEach(el=>{ const p=el.getAttribute('placeholder'); if(AR[p]) el.setAttribute('placeholder',AR[p]); });
+  list.forEach(n=>{
+    const k=n.nodeValue.trim(); if(!k) return;
+    let rep=trPhrase(k);
+    if(rep===null){ // strip leading emoji/symbols (‹ ✓ ＋ 📍 etc.) then retry
+      const stripped=k.replace(/^[^0-9A-Za-z؀-ۿ(]+/,'').trim();
+      if(stripped && stripped!==k){ const r2=trPhrase(stripped); if(r2!==null) rep=k.replace(stripped,r2); }
+    }
+    if(rep!==null) n.nodeValue = n.nodeValue.replace(k, rep);
+  });
+  root.querySelectorAll('[placeholder]').forEach(el=>{ const p=el.getAttribute('placeholder'); const t=trPhrase(p); if(t) el.setAttribute('placeholder',t); });
 }
 function translateAll(){ translateNode(document.querySelector('.phone')); }
 function setLang(l){
