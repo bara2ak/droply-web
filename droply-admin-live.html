@@ -107,7 +107,7 @@ const jod=n=>(Math.round((n||0)*100)/100)+' JOD';
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
 
 let route='dashboard';
-let captains=[], customers=[], discounts=[], settlements=[], deliveries=[], staff=[];
+let captains=[], customers=[], discounts=[], settlements=[], deliveries=[], staff=[], payouts=[];
 const CITIES=['Amman','Zarqa','Irbid','Russeifa','Aqaba','Salt','Madaba','Mafraq','Jerash','Ajloun','Karak',"Ma'an",'Tafilah','Ramtha'];
 const STAFF_ROLES={super_admin:'Super Admin',manager:'Manager',dispatcher:'Dispatcher',support:'Support',finance:'Finance'};
 
@@ -137,13 +137,14 @@ async function boot(){
 
 /* ---------- DATA ---------- */
 async function loadAll(){
-  const [cap,cus,dis,set,del,stf] = await Promise.all([
+  const [cap,cus,dis,set,del,stf,pay] = await Promise.all([
     sb.from('captains').select('*, profiles(full_name,email,mobile,city,created_at)').order('created_at',{ascending:false}),
     sb.from('profiles').select('*').eq('role','customer').order('created_at',{ascending:false}),
     sb.from('discounts').select('*').order('id'),
     sb.from('settlements').select('*').order('created_at',{ascending:false}),
     sb.from('deliveries').select('*, delivery_bags(seq,recipient,address,mobile), customer:profiles(full_name,mobile), captains(plate,profiles(full_name))').order('created_at',{ascending:false}),
     sb.from('profiles').select('*').eq('role','admin').order('created_at',{ascending:false}),
+    sb.from('payouts').select('*').order('created_at',{ascending:false}),
   ]);
   captains=(cap.data||[]).map(c=>({id:c.id, name:c.profiles?.full_name||'—', email:c.profiles?.email||'',
     mobile:c.profiles?.mobile||'', city:c.profiles?.city||'', vehicle:c.vehicle, plate:c.plate,
@@ -155,6 +156,7 @@ async function loadAll(){
   settlements=(set.data||[]);
   deliveries=(del.data||[]);
   staff=(stf.data||[]);
+  payouts=(pay&&pay.data)||[];
 }
 
 /* ---------- NAV ---------- */
@@ -401,8 +403,88 @@ async function deleteDiscount(id){ if(!confirm('Delete this code?'))return; awai
 
 /* ---------- SETTLEMENTS ---------- */
 function capName(id){const c=captains.find(x=>x.id===id);return c?c.name:'—';}
-let fSetQ='', fSetStatus='all';
+let fSetQ='', fSetStatus='all', setTab='incoming', fPayQ='';
+function setGo(t){ setTab=t; render(); }
+function settlementsTabBar(){
+  const tabs=[['incoming','⬇ Owed to Droply'],['outgoing','⬆ Owed to captains']];
+  return `<div style="display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:18px">
+    ${tabs.map(([k,t])=>`<button onclick="setGo('${k}')" style="border:none;background:none;cursor:pointer;padding:10px 14px;font-weight:700;font-size:13.5px;
+      color:${setTab===k?'var(--brand)':'var(--muted)'};border-bottom:3px solid ${setTab===k?'var(--brand)':'transparent'}">${t}</button>`).join('')}</div>`;
+}
+// what Droply owes each captain: their share of ONLINE-paid delivered orders, minus payouts already made
+function captainOwedByUs(id){
+  const earned=deliveries.filter(d=>d.captain_id===id && d.status==='delivered' && d.payment_method==='online')
+    .reduce((s,d)=>s+Number(d.price||0)*0.5,0);
+  const paid=payouts.filter(p=>p.captain_id===id).reduce((s,p)=>s+Number(p.amount||0),0);
+  return Math.round((earned-paid)*100)/100;
+}
+function viewOutgoing(){
+  const rows=captains.map(c=>({c,bal:captainOwedByUs(c.id)}))
+    .filter(x=>x.bal>0.009 && matches(fPayQ,x.c.name,x.c.mobile,x.c.city))
+    .sort((a,b)=>b.bal-a.bal);
+  const total=rows.reduce((s,x)=>s+x.bal,0);
+  const lastPaid=id=>{ const ps=payouts.filter(p=>p.captain_id===id)
+      .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    return ps.length&&ps[0].created_at?new Date(ps[0].created_at).toISOString().slice(0,10):'—'; };
+  const body=rows.map(({c,bal})=>`<tr>
+      <td><div class="u"><div class="nm">${esc(c.name)}</div><div class="em">${esc(c.mobile||'')}</div></div></td>
+      <td>${esc(c.city||'—')}</td>
+      <td><b style="color:var(--green)">${jod(bal)}</b></td>
+      <td>${lastPaid(c.id)}</td>
+      <td><button class="mini g" onclick="openPayout('${c.id}',${bal})">Record payout</button>
+        <button class="mini b" onclick="viewCaptain('${c.id}')">View</button></td></tr>`).join('')
+    || `<tr><td class="empty" colspan="5">🎉 Nothing owed to captains right now.</td></tr>`;
+  const hist=payouts.slice(0,50).map(p=>`<tr>
+      <td>${p.created_at?new Date(p.created_at).toISOString().slice(0,10):'—'}</td>
+      <td>${esc(capName(p.captain_id))}</td><td><b>${jod(p.amount)}</b></td>
+      <td>${esc(p.reference||'—')}</td><td>${esc(p.note||'')}</td></tr>`).join('')
+    || `<tr><td class="empty" colspan="5">No payouts recorded yet.</td></tr>`;
+  return `<div class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input value="${esc(fPayQ)}" id="pay_q" placeholder="Search captain…" style="flex:1;min-width:220px"
+        oninput="fPayQ=this.value;renderKeepFocus('pay_q')">
+      <span style="color:var(--muted);font-size:13px;margin-left:auto">${rows.length} captain${rows.length===1?'':'s'} · ${jod(total)} total</span>
+    </div>
+    <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+      ${kpiCard('⬆ Total owed to captains',jod(total),'Their 50% share of online-paid orders')}
+      ${kpiCard('👥 Captains awaiting payout',rows.length,'')}
+      ${kpiCard('✅ Total paid out',jod(payouts.reduce((s,p)=>s+Number(p.amount||0),0)),`${payouts.length} payouts`)}
+    </div>
+    <div class="panel" style="margin-bottom:24px"><div class="ph">Captains we owe</div>
+      <table><thead><tr><th>Captain</th><th>City</th><th>We owe</th><th>Last paid</th><th>Actions</th></tr></thead><tbody>${body}</tbody></table></div>
+    <div class="panel"><div class="ph">Payout history</div>
+      <table><thead><tr><th>Date</th><th>Captain</th><th>Amount</th><th>Reference</th><th>Note</th></tr></thead><tbody>${hist}</tbody></table></div>`;
+}
+function openPayout(id,suggested){
+  const c=captains.find(x=>x.id===id); if(!c)return;
+  openModal(`<div class="mh"><h3>Record payout — ${esc(c.name)}</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb">
+      <div style="background:var(--brand-soft);border-radius:10px;padding:12px;margin-bottom:12px;font-size:13px">
+        Outstanding to this captain: <b>${jod(suggested)}</b></div>
+      <label>Amount paid (JOD)</label><input id="po_amt" type="number" step="0.5" min="0" value="${suggested}">
+      <label>Bank / transfer reference</label><input id="po_ref" placeholder="e.g. transfer no.">
+      <label>Note (optional)</label><input id="po_note" placeholder="e.g. weekly payout">
+      <div style="font-size:12px;color:var(--muted);margin-top:10px">Records that Droply transferred this amount to the captain. It reduces what we owe them.</div>
+    </div>
+    <div class="mf"><button class="btn outline" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="savePayout('${id}')">Save payout</button></div>`);
+}
+async function savePayout(id){
+  const amt=parseFloat($('po_amt').value);
+  if(!(amt>0)){toast('Enter an amount');return;}
+  const {error}=await sb.from('payouts').insert({captain_id:id,amount:amt,
+    reference:($('po_ref').value||'').trim(),note:($('po_note').value||'').trim()});
+  if(error){toast(error.message+' — did you run payouts.sql?');return;}
+  closeModal(); await loadAll(); render(); toast('Payout recorded');
+}
 function viewSettlements(){
+  if(setTab==='outgoing'){
+    return `<div class="head"><div><h1>Settlements</h1><div class="sub">Money owed between Droply and captains</div></div>
+      <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
+      ${settlementsTabBar()}${viewOutgoing()}`;
+  }
+  return viewIncoming();
+}
+function viewIncoming(){
   const list=settlements.filter(s=>
     matches(fSetQ,capName(s.captain_id),s.reference,String(s.amount)) &&
     (fSetStatus==='all'||s.status===fSetStatus));
@@ -437,6 +519,7 @@ function viewSettlements(){
 
   return `<div class="head"><div><h1>Settlements</h1><div class="sub">${settlements.filter(s=>s.status==='pending').length} pending · ${jod(owedTotal)} outstanding</div></div>
     <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
+    ${settlementsTabBar()}
     ${bar}
     <div class="panel" style="margin-bottom:24px"><div class="ph">Transfer submissions</div>
       <table><thead><tr><th>Date</th><th>Captain</th><th>Amount</th><th>Reference</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
