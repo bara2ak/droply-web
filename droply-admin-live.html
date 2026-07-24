@@ -140,7 +140,7 @@ async function loadAll(){
     sb.from('profiles').select('*').eq('role','customer').order('created_at',{ascending:false}),
     sb.from('discounts').select('*').order('id'),
     sb.from('settlements').select('*').order('created_at',{ascending:false}),
-    sb.from('deliveries').select('*').order('created_at',{ascending:false}),
+    sb.from('deliveries').select('*, delivery_bags(seq,recipient,address,mobile), customer:profiles(full_name,mobile), captains(plate,profiles(full_name))').order('created_at',{ascending:false}),
     sb.from('profiles').select('*').eq('role','admin').order('created_at',{ascending:false}),
   ]);
   captains=(cap.data||[]).map(c=>({id:c.id, name:c.profiles?.full_name||'—', email:c.profiles?.email||'',
@@ -226,13 +226,51 @@ function viewCustomers(){
 }
 
 /* ---------- DELIVERIES ---------- */
+function delRecipients(d){ return ((d.delivery_bags||[]).slice().sort((a,b)=>(a.seq||0)-(b.seq||0)).map(b=>b.recipient).filter(Boolean)); }
 function viewDeliveries(){
-  const rows=deliveries.map(d=>`<tr><td>#${d.id}</td><td>${esc(d.from_city)} → ${esc(d.to_city)}</td>
-    <td>${jod(d.price)}</td><td>${esc(d.status)}</td><td>${new Date(d.created_at).toISOString().slice(0,10)}</td></tr>`).join('')
-    || `<tr><td class="empty" colspan="5">No deliveries yet — they appear here once orders are wired to the database.</td></tr>`;
+  const rows=deliveries.map(d=>{
+    const recips=delRecipients(d); const recTxt=recips.length? (recips[0]+(recips.length>1?' +'+(recips.length-1):'')):'—';
+    const capName=d.captains&&d.captains.profiles?d.captains.profiles.full_name:'—';
+    return `<tr>
+      <td>#${d.id}</td>
+      <td>${esc(d.customer?d.customer.full_name:'—')}</td>
+      <td>${esc(recTxt)}</td>
+      <td>${esc(d.from_city)} → ${esc(d.to_city)}</td>
+      <td>${esc(capName)}</td>
+      <td>${jod(d.price)}</td>
+      <td><span class="pill p-${d.status==='delivered'?'verified':d.status==='cancelled'?'suspended':d.status==='pending'?'pending':'verified'}">${esc(d.status)}</span></td>
+      <td><button class="mini b" onclick="openDelivery(${d.id})">Details</button></td></tr>`;
+  }).join('') || `<tr><td class="empty" colspan="8">No deliveries yet.</td></tr>`;
   return `<div class="head"><div><h1>Deliveries</h1><div class="sub">${deliveries.length} total</div></div>
     <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
-    <div class="panel"><table><thead><tr><th>ID</th><th>Route</th><th>Price</th><th>Status</th><th>Created</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="panel"><table><thead><tr><th>ID</th><th>Customer</th><th>Recipient</th><th>Route</th><th>Captain</th><th>Price</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function openDelivery(id){
+  const d=deliveries.find(x=>x.id===id); if(!d)return;
+  const bags=(d.delivery_bags||[]).slice().sort((a,b)=>(a.seq||0)-(b.seq||0));
+  const capName=d.captains&&d.captains.profiles?d.captains.profiles.full_name:'—';
+  const capPlate=d.captains?d.captains.plate||'':'';
+  openModal(`<div class="mh"><h3>Delivery #${d.id}</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb">
+      <div class="two">
+        <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Customer</div><b>${esc(d.customer?d.customer.full_name:'—')}</b><div style="font-size:12px;color:var(--muted)">${esc(d.customer?d.customer.mobile||'':'')}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Captain</div><b>${esc(capName)}</b><div style="font-size:12px;color:var(--muted)">${esc(capPlate)}</div></div>
+      </div>
+      <div style="height:12px"></div>
+      <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Pickup location</div>
+      <div style="font-weight:600;margin-bottom:12px">${esc(d.pickup_addr||'—')}</div>
+      <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Drop-off${bags.length>1?'s':''} (${bags.length})</div>
+      ${bags.map((b,i)=>`<div style="padding:9px 0;border-bottom:1px solid var(--line)">
+        <b>${bags.length>1?(i+1)+'. ':''}${esc(b.recipient)}</b>
+        <div style="font-size:13px;color:var(--muted)">📍 ${esc(b.address||'—')}</div>
+        <div style="font-size:13px;color:var(--muted)">📞 ${esc(b.mobile||'—')}</div></div>`).join('')||'<div style="color:var(--muted)">—</div>'}
+      <div class="two" style="margin-top:14px">
+        <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Price</div><b>${jod(d.price)}</b> · ${d.payment_method==='cod'?'💵 Cash':'💳 Online'}</div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Status</div><b>${esc(d.status)}</b></div>
+      </div>
+      ${d.notes?`<div style="margin-top:12px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Notes</div>${esc(d.notes)}</div>`:''}
+    </div>
+    <div class="mf"><button class="btn outline" onclick="closeModal()">Close</button></div>`);
 }
 
 /* ---------- DISCOUNTS ---------- */
