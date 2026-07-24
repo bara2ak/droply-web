@@ -270,7 +270,35 @@ function openDelivery(id){
       </div>
       ${d.notes?`<div style="margin-top:12px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Notes</div>${esc(d.notes)}</div>`:''}
     </div>
-    <div class="mf"><button class="btn outline" onclick="closeModal()">Close</button></div>`);
+    <div class="mf">
+      ${(d.status==='pending'||d.status==='assigned'||d.status==='transit')?`<button class="mini r" onclick="adminCancelDelivery(${d.id})">Cancel delivery</button>`:''}
+      ${(d.status==='assigned'||d.status==='transit')?`<button class="mini g" onclick="adminDeliver(${d.id})">Mark delivered</button>`:''}
+      <button class="btn outline" onclick="closeModal()">Close</button>
+    </div>`);
+}
+async function adminCancelDelivery(id){
+  if(!confirm('Cancel this delivery? It will be marked cancelled and unassigned.'))return;
+  const {error}=await sb.from('deliveries').update({status:'cancelled',captain_id:null}).eq('id',id);
+  if(error){toast(error.message);return;}
+  closeModal(); await loadAll(); render(); toast('Delivery cancelled');
+}
+async function adminDeliver(id){
+  const d=deliveries.find(x=>x.id===id); if(!d)return;
+  if(!confirm('Mark this delivery as delivered?\n\nThis credits the captain’s earnings (and adds the COD commission if cash).'))return;
+  const {error}=await sb.from('deliveries').update({status:'delivered'}).eq('id',id);
+  if(error){toast(error.message);return;}
+  // credit the captain, mirroring what the app does on delivery
+  if(d.captain_id){
+    const price=Number(d.price||0);
+    const comm=Math.round(price*0.5*100)/100, net=Math.round((price-comm)*100)/100;
+    const {data:cap}=await sb.from('captains').select('earnings,owed').eq('id',d.captain_id).single();
+    if(cap){
+      const upd={earnings:Math.round((Number(cap.earnings||0)+net)*100)/100};
+      if((d.payment_method||'cod')==='cod') upd.owed=Math.round((Number(cap.owed||0)+comm)*100)/100;
+      await sb.from('captains').update(upd).eq('id',d.captain_id);
+    }
+  }
+  closeModal(); await loadAll(); render(); toast('Marked as delivered'+(d.captain_id?' · captain credited':''));
 }
 
 /* ---------- DISCOUNTS ---------- */
