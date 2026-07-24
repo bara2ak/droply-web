@@ -379,8 +379,16 @@ function mapDelivery(r){
     bags:(r.delivery_bags||[]).slice().sort((a,b)=>(a.seq||0)-(b.seq||0)).map(b=>({recipient:b.recipient,addr:b.address,mobile:b.mobile})) };
 }
 const DELSEL='*, delivery_bags(*), customer:profiles(full_name,mobile), captains(vehicle,plate,profiles(full_name,mobile))';
-function telHref(m){return 'tel:'+String(m||'').replace(/[^\d+]/g,'');}
-function waHref(m){return 'https://wa.me/'+String(m||'').replace(/[^\d]/g,'');}
+// Normalise any Jordan number to full international digits (962XXXXXXXXX)
+function normJo(m){
+  let d=String(m||'').replace(/\D/g,'');
+  if(d.startsWith('00')) d=d.slice(2);       // 00962… -> 962…
+  if(d.startsWith('962')) return d;          // already has country code
+  if(d.startsWith('0')) return '962'+d.slice(1); // 07… -> 9627…
+  return '962'+d;                            // 7… -> 9627…
+}
+function telHref(m){return 'tel:+'+normJo(m);}
+function waHref(m){return 'https://wa.me/'+normJo(m);}
 async function loadDeliveries(){
   try{
     let rows=[];
