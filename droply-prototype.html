@@ -1310,9 +1310,15 @@ function setAppHeight(){
   else { p.style.height = ''; }
 }
 window.addEventListener('resize', setAppHeight);
-if (window.visualViewport) window.visualViewport.addEventListener('resize', setAppHeight);
-window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight, 200); });
+window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight, 250); });
 setAppHeight();
+/* keep the focused field visible when the on-screen keyboard opens */
+document.addEventListener('focusin', function(e){
+  var t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) {
+    setTimeout(function(){ try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(_){} }, 300);
+  }
+});
 
 /* ---- register service worker (makes the app installable) ---- */
 if ('serviceWorker' in navigator) {
