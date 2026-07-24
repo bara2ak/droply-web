@@ -120,6 +120,8 @@ async function login(){
   if(error){$('l_hint').textContent='Wrong email or password.';return;}
   const {data:isAdmin}=await sb.rpc('is_admin');
   if(!isAdmin){ $('l_hint').textContent='This account is not an admin.'; await sb.auth.signOut(); return; }
+  const {data:me}=await sb.from('profiles').select('suspended').eq('id',(await sb.auth.getUser()).data.user.id).maybeSingle();
+  if(me&&me.suspended){ $('l_hint').textContent='This account is suspended.'; await sb.auth.signOut(); return; }
   $('whoami').textContent=email;
   $('login').style.display='none'; $('app').style.display='block';
   await loadAll(); go('dashboard');
@@ -456,16 +458,34 @@ async function addCaptain(){
 /* ---------- TEAM ---------- */
 function viewTeam(){
   const meEmail=$('whoami').textContent;
-  const rows=staff.map(s=>`<tr>
-    <td><div class="u"><div class="nm">${esc(s.full_name)}${s.email===meEmail?'<span class="you">You</span>':''}</div><div class="em">${esc(s.email)}</div></div></td>
+  const rows=staff.map(s=>{
+    const me=s.email===meEmail;
+    return `<tr>
+    <td><div class="u"><div class="nm">${esc(s.full_name)}${me?'<span class="you">You</span>':''}</div><div class="em">${esc(s.email)}</div></div></td>
     <td><span class="pill p-role">${STAFF_ROLES[s.staff_role]||'Admin'}</span></td>
+    <td>${s.suspended?'<span class="pill p-suspended">Suspended</span>':'<span class="pill p-verified">Active</span>'}</td>
     <td>${s.created_at?new Date(s.created_at).toISOString().slice(0,10):'—'}</td>
-    <td><button class="mini b" onclick="openStaff('${s.id}')">Edit role</button></td></tr>`).join('')
-    || `<tr><td class="empty" colspan="4">No team members.</td></tr>`;
-  const roleCards=Object.entries(STAFF_ROLES).map(([k,v])=>`<div class="kpi"><div class="l">🔑 ${v}</div></div>`).join('');
+    <td>
+      <button class="mini b" onclick="openStaff('${s.id}')">Edit role</button>
+      ${me?'':`<button class="mini ${s.suspended?'g':'r'}" onclick="toggleStaffSuspend('${s.id}',${!s.suspended})">${s.suspended?'Unsuspend':'Suspend'}</button>
+      <button class="mini r" onclick="removeStaff('${s.id}')">Remove</button>`}
+    </td></tr>`;}).join('')
+    || `<tr><td class="empty" colspan="5">No team members.</td></tr>`;
   return `<div class="head"><div><h1>Team</h1><div class="sub">${staff.length} admin/staff members</div></div>
     <div style="display:flex;gap:8px"><button class="btn sm outline" onclick="reload()">↻ Refresh</button><button class="btn sm" onclick="openNewStaff()">＋ Add member</button></div></div>
-    <div class="panel" style="margin-bottom:18px"><table><thead><tr><th>Member</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="panel" style="margin-bottom:18px"><table><thead><tr><th>Member</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+async function toggleStaffSuspend(id,suspend){
+  const {error}=await sb.from('profiles').update({suspended:suspend}).eq('id',id);
+  if(error){toast(error.message+' — did you run suspend.sql?');return;}
+  await loadAll(); render(); toast(suspend?'Member suspended':'Member reactivated');
+}
+async function removeStaff(id){
+  const s=staff.find(x=>x.id===id); if(!s)return;
+  if(!confirm('Remove '+s.full_name+' from the team?\n\nThey will lose admin access immediately.'))return;
+  const {error}=await sb.from('profiles').delete().eq('id',id);
+  if(error){toast(error.message);return;}
+  await loadAll(); render(); toast('Member removed');
 }
 function openStaff(id){
   const s=staff.find(x=>x.id===id); if(!s)return;
