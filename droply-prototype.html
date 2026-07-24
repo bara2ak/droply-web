@@ -1043,6 +1043,9 @@ function driverJob(){
       <p class="sub" style="text-align:center;margin-top:8px">You can cancel until you confirm pickup.</p>`;
   }
   else if(d.status==='transit'){
+    h+=`<a class="btn" href="${navUrl((d.bags[0]||{}).addr||d.toCity)}" target="_blank" rel="noopener"
+        style="display:block;text-align:center;text-decoration:none">🧭 Navigate to drop-off</a>
+      <div style="height:10px"></div>`;
     if((d.paymentMethod||'cod')==='cod')h+=`<div class="card" style="text-align:center;background:var(--amber-soft);border-color:var(--amber);color:var(--amber);font-weight:700;font-size:13px">💵 Collect ${jod(d.price)} cash from the recipient</div>`;
     h+=`<button class="btn green" onclick="advance(${d.id})">Mark as delivered ✓</button>`;
   }
