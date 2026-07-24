@@ -245,6 +245,7 @@ function viewCaptains(){
       ${c.status==='suspended'?`<button class="mini g" onclick="setCaptain('${c.id}','verified')">Reinstate</button>`:''}
       <button class="mini b" onclick="viewCaptain('${c.id}')">View</button>
       <button class="mini b" onclick="openCaptain('${c.id}')">Edit</button>
+      <button class="mini r" onclick="deleteUser('${c.id}','${esc(c.name)}','captain')">Delete</button>
     </td></tr>`).join('') || `<tr><td class="empty" colspan="7">No captains match your search.</td></tr>`;
   return `<div class="head"><div><h1>Captains</h1><div class="sub">${captains.length} registered · ${captains.filter(c=>c.status==='pending').length} awaiting approval</div></div>
     <div style="display:flex;gap:8px"><button class="btn sm outline" onclick="reload()">↻ Refresh</button><button class="btn sm" onclick="openNewCaptain()">＋ Add captain</button></div></div>
@@ -275,6 +276,7 @@ function viewCustomers(){
     <td>
       <button class="mini b" onclick="openCustomer('${c.id}')">Edit</button>
       <button class="mini ${c.suspended?'g':'r'}" onclick="toggleCustomerSuspend('${c.id}',${!c.suspended})">${c.suspended?'Unsuspend':'Suspend'}</button>
+      <button class="mini r" onclick="deleteUser('${c.id}','${esc(c.full_name)}','customer')">Delete</button>
     </td></tr>`).join('')
     || `<tr><td class="empty" colspan="6">No customers match your search.</td></tr>`;
   return `<div class="head"><div><h1>Customers</h1><div class="sub">${customers.length} registered · ${customers.filter(c=>c.suspended).length} suspended</div></div>
@@ -855,6 +857,17 @@ function openCaptain(id){
       <div style="font-size:12px;color:var(--muted);margin-top:4px">Sets a new login password for this captain. Requires the admin-set-password function.</div>
     </div>
     <div class="mf"><button class="btn outline" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCaptain('${id}')">Save</button></div>`);
+}
+async function deleteUser(id,name,kind){
+  const extra = kind==='customer'
+    ? '\n\nTheir delivery history will be removed too.'
+    : '\n\nTheir past deliveries stay, but will show no captain.';
+  if(!confirm('Permanently delete '+name+'?'+extra+'\n\nThis cannot be undone. (Suspend instead if you only want to block access.)'))return;
+  if(!confirm('Are you sure? Type-free final confirmation — delete '+name+' for good?'))return;
+  const {data,error}=await sb.functions.invoke('admin-delete-user',{body:{user_id:id}});
+  if(error){ toast('Delete failed — is the admin-delete-user function deployed?'); return; }
+  if(data&&data.error){ toast(data.error); return; }
+  await loadAll(); render(); toast(name+' deleted');
 }
 async function setUserPassword(id,pass){
   if(!pass) return true;
