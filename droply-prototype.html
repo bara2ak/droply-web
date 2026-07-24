@@ -264,6 +264,15 @@
   /* iOS installed PWA: env() safe-area is unreliable, so guarantee clearance */
   html.ios-pwa .nav{ position:static !important; padding-top:8px !important; padding-bottom:34px !important; height:auto !important; min-height:auto !important; }
   html.ios-pwa .screen{ padding-top:max(14px, env(safe-area-inset-top)); }
+
+  /* ===== Arabic / RTL ===== */
+  [dir=rtl]{ direction:rtl; }
+  [dir=rtl] .route{ padding-left:0; padding-right:6px; }
+  [dir=rtl] .switch{ right:auto; left:16px; }
+  [dir=rtl] .stop .ic .line{ }
+  [dir=rtl] .back{ direction:ltr; text-align:right; }
+  [dir=rtl] .meta{ direction:rtl; }
+  [dir=rtl] .prof-row, [dir=rtl] .between{ direction:rtl; }
 </style>
 </head>
 <body>
@@ -432,8 +441,85 @@ let draft={fromCity:'Amman',pickAddr:'',pickCoords:'',toCity:'Amman',multi:false
 /* ---------------- HELPERS ---------------- */
 const $=id=>document.getElementById(id);
 const esc=s=>(s||'').replace(/</g,'&lt;');
-function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');
+function toast(msg){const t=$('toast');t.textContent=lang==='ar'&&AR[msg]?AR[msg]:msg;t.classList.add('show');
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);}
+
+/* ================= LANGUAGE (English / Arabic) ================= */
+let lang = (function(){ try{ return localStorage.getItem('droply_lang')||'en'; }catch(_){ return 'en'; } })();
+let PICKER_HTML = '';
+const AR = {
+  // role picker
+  "I want to send a package":"أريد إرسال طرد","Create a delivery and track it in real time":"أنشئ طلب توصيل وتتبّعه مباشرة",
+  "I'm a captain":"أنا كابتن","Browse nearby jobs and earn on your schedule":"تصفّح الطلبات القريبة واكسب بوقتك",
+  "Send anything, anywhere. Post a delivery and a nearby captain picks it up.":"أرسل أي شيء إلى أي مكان. انشر طلبًا ويستلمه كابتن قريب منك.",
+  // auth
+  "Create your account":"أنشئ حسابك","Welcome back":"مرحبًا بعودتك","Log in":"تسجيل الدخول","Sign up":"إنشاء حساب",
+  "Customer account · Droply":"حساب عميل · Droply","Captain account · Droply":"حساب كابتن · Droply",
+  "Full name":"الاسم الكامل","Mobile number":"رقم الجوال","City":"المدينة","Email":"البريد الإلكتروني","Password":"كلمة المرور",
+  "Create account":"إنشاء الحساب","First name":"الاسم الأول","Last name":"اسم العائلة","Vehicle":"المركبة","License plate":"رقم اللوحة",
+  "Verification documents":"وثائق التحقق","Government ID":"الهوية الرسمية","Driving license":"رخصة القيادة","Proof of no criminal record":"شهادة عدم محكومية",
+  "Submit for verification":"إرسال للتحقق","Tap to upload":"اضغط للرفع","Select your city":"اختر مدينتك",
+  "Verification in review":"التحقق قيد المراجعة","I've been approved — continue →":"تمت الموافقة — متابعة →","Back to log in":"العودة لتسجيل الدخول",
+  // nav / tabs
+  "Home":"الرئيسية","Send":"إرسال","Profile":"الملف","Jobs":"الطلبات","My trips":"رحلاتي","Earnings":"الأرباح",
+  // customer home
+  "Your deliveries":"طلباتك","Active":"نشطة","Completed":"مكتملة","＋ New delivery":"＋ طلب جديد","New delivery":"طلب جديد",
+  "No deliveries yet":"لا توجد طلبات بعد","Same city":"نفس المدينة","Cross-city":"بين المدن",
+  // statuses
+  "Looking for captain":"البحث عن كابتن","Captain assigned":"تم تعيين كابتن","In transit":"قيد التوصيل","Delivered":"تم التوصيل","Cancelled":"ملغى",
+  // create delivery
+  "Pickup city":"مدينة الاستلام","Pickup location":"موقع الاستلام","Drop-off city":"مدينة التسليم","Package size":"حجم الطرد",
+  "Small":"صغير","Medium":"متوسط","Payment method":"طريقة الدفع","Cash on delivery":"الدفع عند الاستلام","Pay online":"الدفع أونلاين",
+  "Notes for captain (optional)":"ملاحظات للكابتن (اختياري)","Discount code (optional)":"كود خصم (اختياري)","Apply":"تطبيق","Update":"تحديث",
+  "Recipient name":"اسم المستلم","Drop-off location":"موقع التسليم","Recipient mobile":"جوال المستلم","Choose on map":"اختر على الخريطة","Change":"تغيير",
+  "Sending items to multiple addresses":"إرسال لعناوين متعددة","＋ Add another address":"＋ إضافة عنوان آخر","Use my current location":"استخدم موقعي الحالي","Use GPS":"استخدام GPS",
+  // tracking
+  "Cancel delivery":"إلغاء الطلب","Progress":"التقدّم","Delivery posted":"تم نشر الطلب","Picked up & in transit":"تم الاستلام وقيد التوصيل",
+  "Finding a nearby captain…":"جارٍ البحث عن كابتن قريب…","Delivery cancelled":"تم إلغاء الطلب","Your captain":"الكابتن الخاص بك","📞 Call captain":"📞 اتصل بالكابتن",
+  // captain
+  "Enable your location":"فعّل موقعك","Enable location":"تفعيل الموقع","Claim this job":"استلام هذا الطلب","Confirm pickup →":"تأكيد الاستلام →",
+  "Cancel claim":"إلغاء الاستلام","Mark as delivered ✓":"تحديد كمُسلَّم ✓","🧭 Navigate to pickup":"🧭 التنقل إلى الاستلام","🧭 Navigate to drop-off":"🧭 التنقل إلى التسليم",
+  "Pickup":"الاستلام","Payment":"الدفع","Contact pickup customer":"التواصل مع العميل","Contact customer":"التواصل مع العميل","📞 Call":"📞 اتصال","💬 WhatsApp":"💬 واتساب",
+  "No trips yet":"لا توجد رحلات بعد","No open jobs right now":"لا توجد طلبات متاحة الآن","Your net earnings":"صافي أرباحك","Owed to Droply":"مستحق لـ Droply",
+  "I've transferred — submit proof":"لقد حوّلت — إرسال الإثبات","Your transfers":"تحويلاتك","Under review":"قيد المراجعة","Approved":"موافق عليه","Rejected":"مرفوض",
+  "Transfer to Droply":"التحويل إلى Droply","Amount you transferred (JOD)":"المبلغ الذي حوّلته (دينار)","Submit for review":"إرسال للمراجعة","Proof of transfer":"إثبات التحويل",
+  // profile
+  "Your account":"حسابك","Name":"الاسم","Mobile":"الجوال","Vehicle & plate":"المركبة واللوحة","Total earned":"إجمالي الأرباح","Deliveries sent":"الطلبات المرسلة",
+  "✎ Edit profile":"✎ تعديل الملف","↺ Switch role":"↺ تبديل الدور","Log out":"تسجيل الخروج","Edit profile":"تعديل الملف","Save changes":"حفظ التغييرات","Cancel":"إلغاء","Language":"اللغة",
+  // notifications
+  "Notifications":"الإشعارات","No notifications yet":"لا توجد إشعارات بعد",
+  // role tag + common
+  "Customer":"عميل","Captain":"كابتن","Back":"رجوع","‹ Back":"‹ رجوع",
+};
+function translateNode(root){
+  if(lang!=='ar'||!root) return;
+  const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const list=[]; while(w.nextNode()) list.push(w.currentNode);
+  list.forEach(n=>{ const k=n.nodeValue.trim(); if(k && AR[k]) n.nodeValue = n.nodeValue.replace(k, AR[k]); });
+  root.querySelectorAll('[placeholder]').forEach(el=>{ const p=el.getAttribute('placeholder'); if(AR[p]) el.setAttribute('placeholder',AR[p]); });
+}
+function translateAll(){ translateNode(document.querySelector('.phone')); }
+function setLang(l){
+  lang=l; try{ localStorage.setItem('droply_lang', l); }catch(_){}
+  document.querySelector('.phone').setAttribute('dir', l==='ar'?'rtl':'ltr');
+  if(PICKER_HTML) $('picker').innerHTML = PICKER_HTML;   // reset picker to English base
+  addLangToggleToPicker();
+  if(role){ render(); }
+  else if($('authScreen').style.display!=='none'){ renderAuth(); }
+  translateAll();
+}
+function langToggleHtml(){
+  return `<div style="display:flex;gap:8px;justify-content:center;margin-bottom:22px">
+    <button onclick="setLang('en')" style="background:${lang==='en'?'#fff':'rgba(255,255,255,.15)'};color:${lang==='en'?'#2563eb':'#fff'};border:1px solid rgba(255,255,255,.4);border-radius:20px;padding:6px 16px;font-weight:700;cursor:pointer">English</button>
+    <button onclick="setLang('ar')" style="background:${lang==='ar'?'#fff':'rgba(255,255,255,.15)'};color:${lang==='ar'?'#2563eb':'#fff'};border:1px solid rgba(255,255,255,.4);border-radius:20px;padding:6px 16px;font-weight:700;cursor:pointer">العربية</button>
+  </div>`;
+}
+function addLangToggleToPicker(){
+  const p=$('picker'); if(!p||p.querySelector('.langtoggle'))return;
+  const div=document.createElement('div'); div.className='langtoggle'; div.innerHTML=langToggleHtml();
+  p.insertBefore(div.firstElementChild||div, p.firstChild);
+}
+
 /* ---- notifications (backed by Supabase) ---- */
 let notifId=1;
 let notifications=[];
@@ -530,7 +616,7 @@ function enterApp(){ tab='home'; screen='main'; resetDocs(); show('app'); render
 
 function renderAuth(){
   const v=$('authView');
-  if(verifyEmail){ v.innerHTML=verifyScreen(); return; }
+  if(verifyEmail){ v.innerHTML=verifyScreen(); translateAll(); return; }
   const isDriver=role==='driver';
   const su=authMode==='signup';
   const head=`
@@ -541,7 +627,7 @@ function renderAuth(){
       <button class="${!su?'on':''}" onclick="authMode='login';resetDocs();renderAuth()">Log in</button>
       <button class="${su?'on':''}" onclick="authMode='signup';resetDocs();renderAuth()">Sign up</button>
     </div>`;
-  if(su && isDriver){ v.innerHTML=head+driverSignupForm(); return; }
+  if(su && isDriver){ v.innerHTML=head+driverSignupForm(); translateAll(); return; }
   v.innerHTML=head+`
     ${su?`<label>Full name</label><input id="a_name" placeholder="Your name">
     <label>Mobile number</label><input id="a_mobile" type="tel" placeholder="+962 7 0000 0000">
@@ -552,6 +638,7 @@ function renderAuth(){
     <button class="btn" onclick="submitAuth()">${su?'Create account':'Log in'}</button>
     <div class="demo">${su?'Already have an account? ':'New to Droply? '}
       <a onclick="authMode='${su?'login':'signup'}';resetDocs();renderAuth()">${su?'Log in':'Create one'}</a></div>`;
+  translateAll();
 }
 function uplTile(key,ic,title,accept){
   const done=!!docs[key];
@@ -696,7 +783,7 @@ function render(){
   $('roleTag').textContent = role==='driver'?'Captain':'Customer';
   const v=$('view');
   v.innerHTML = role==='customer'?renderCustomer():renderDriver();
-  renderNav(); v.scrollTop=0; updateBell();
+  renderNav(); v.scrollTop=0; updateBell(); translateAll();
   if(role==='customer'&&screen==='track') setTimeout(()=>setupTracking(selected),60);
   else stopTracking();
 }
@@ -1240,6 +1327,12 @@ function profile(){
       <div style="font-size:13px;color:var(--muted)">${esc(u.email)}</div>
       ${verified?'<div style="margin-top:8px"><span class="vbadge">✓ Verified captain</span></div>':''}</div>
     <div class="card">${rows.map(([k,v])=>`<div class="prof-row"><span>${k}</span><b>${esc(String(v))}</b></div>`).join('')}</div>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between">
+      <b style="font-size:14px">Language</b>
+      <div style="display:flex;gap:6px">
+        <button onclick="setLang('en')" style="background:${lang==='en'?'var(--brand)':'#fff'};color:${lang==='en'?'#fff':'var(--ink)'};border:1.5px solid var(--line);border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer">English</button>
+        <button onclick="setLang('ar')" style="background:${lang==='ar'?'var(--brand)':'#fff'};color:${lang==='ar'?'#fff':'var(--ink)'};border:1.5px solid var(--line);border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer">العربية</button>
+      </div></div>
     <button class="btn ghost" onclick="screen='settings';render()">✎ Edit profile</button>
     <div style="height:10px"></div>
     <button class="btn outline" onclick="backToPicker()">↺ Switch role</button>
@@ -1319,6 +1412,12 @@ document.addEventListener('focusin', function(e){
     setTimeout(function(){ try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(_){} }, 300);
   }
 });
+
+/* ---- language init: capture picker, add toggle, apply saved language ---- */
+PICKER_HTML = $('picker').innerHTML;
+addLangToggleToPicker();
+document.querySelector('.phone').setAttribute('dir', lang==='ar'?'rtl':'ltr');
+if (lang==='ar') translateAll();
 
 /* ---- register service worker (makes the app installable) ---- */
 if ('serviceWorker' in navigator) {
