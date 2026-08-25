@@ -369,6 +369,24 @@ const COUNTRIES={
   SA:{name:'Saudi Arabia',flag:'🇸🇦',dial:'966',cities:SA_CITIES,ph:'05 0000 0000'},
 };
 function citiesFor(code){ return (COUNTRIES[code]||COUNTRIES.JO).cities; }
+/* map centres so the picker opens where the user actually is */
+const CITY_COORDS={
+  Amman:[31.9539,35.9106], Zarqa:[32.0728,36.0880], Irbid:[32.5556,35.8500], Russeifa:[32.0181,36.0464],
+  Aqaba:[29.5320,35.0060], Salt:[32.0392,35.7272], Madaba:[31.7160,35.7950], Mafraq:[32.3430,36.2080],
+  Jerash:[32.2808,35.8990], Ajloun:[32.3326,35.7519], Karak:[31.1850,35.7047], "Ma'an":[30.1962,35.7340],
+  Tafilah:[30.8375,35.6045], Ramtha:[32.5590,36.0080],
+  Riyadh:[24.7136,46.6753], Jeddah:[21.4858,39.1925], Mecca:[21.3891,39.8579], Medina:[24.5247,39.5692],
+  Dammam:[26.3927,49.9777], Khobar:[26.2794,50.2083], Dhahran:[26.2886,50.1140], Taif:[21.2854,40.4183],
+  Tabuk:[28.3835,36.5662], Buraidah:[26.3260,43.9750], Abha:[18.2465,42.5117], "Khamis Mushait":[18.3060,42.7290],
+  Hail:[27.5219,41.6907], Najran:[17.4917,44.1322], Jubail:[27.0046,49.6461], Yanbu:[24.0895,38.0618],
+  Hofuf:[25.3644,49.5876], Jazan:[16.8892,42.5706],
+};
+const COUNTRY_CENTRE={JO:[31.9539,35.9106], SA:[24.7136,46.6753]};
+function defaultMapCentre(){
+  const cc=countryOfUser();
+  const city=(typeof draft!=='undefined' && draft && draft.fromCity) || (currentUser()&&currentUser().city);
+  return CITY_COORDS[city] || COUNTRY_CENTRE[cc] || COUNTRY_CENTRE.JO;
+}
 function countryOfUser(){ const u=currentUser(); return (u&&u.country)||'JO'; }
 const COMMISSION=0.5;                 // Droply's cut of each delivery fee (50%)
 /* pricing: fixed base fare + per-km rate, per country */
@@ -1003,9 +1021,15 @@ function chooseOnMap(target){
   mapTarget = (target===undefined?'pickup':target);
   document.getElementById('mapTitle').textContent = mapTarget==='pickup'?'Set pickup location':'Set drop-off location';
   document.getElementById('mapOverlay').classList.add('show');
-  let start=[31.9539,35.9106]; // Amman default
+  // open on the user's own city / country, not a fixed default
+  let start=defaultMapCentre();
   if(mapTarget==='pickup'){ if(draft.pickCoords) start=draft.pickCoords.split(',').map(parseFloat); }
-  else { const m=(draft.bags[mapTarget].addr||'').match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/); if(m) start=[parseFloat(m[1]),parseFloat(m[2])]; }
+  else {
+    const m=(draft.bags[mapTarget].addr||'').match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/);
+    if(m) start=[parseFloat(m[1]),parseFloat(m[2])];
+    else if(draft.pickCoords) start=draft.pickCoords.split(',').map(parseFloat);   // near the pickup
+    else if(CITY_COORDS[draft.toCity]) start=CITY_COORDS[draft.toCity];
+  }
   setTimeout(()=>{
     if(typeof L==='undefined'){toast('Map failed to load — check your connection');closeMap();return;}
     if(!pickMap){
@@ -1060,7 +1084,7 @@ function custCreate(){
           <a onclick="chooseOnMap(${i})" style="color:var(--brand);font-weight:700;cursor:pointer;font-size:12.5px">Change</a></div>`
         :`<button class="btn ghost sm" style="width:auto;margin-top:6px;padding:10px 14px" onclick="chooseOnMap(${i})">🗺️ Choose on map</button>`}
       <label>Recipient mobile</label>
-      <input type="tel" placeholder="+962 7 0000 0000" value="${esc(b.mobile)}" oninput="draft.bags[${i}].mobile=this.value">
+      <input type="tel" placeholder="+${COUNTRIES[cc].dial} ${COUNTRIES[cc].ph}" value="${esc(b.mobile)}" oninput="draft.bags[${i}].mobile=this.value">
     </div>`).join('');
   return `<button class="back" onclick="back()">‹ Back</button>
     <h1>New delivery</h1><p class="sub">One pickup, one captain — send to one or many people.</p>
@@ -1146,7 +1170,8 @@ async function submitDelivery(){
       discount_code:disc?disc.code:null }).select().single();
     if(error){toast(error.message);return;}
     const rows=draft.bags.map((b,i)=>{const m=(b.addr||'').match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/);
-      return {delivery_id:del.id,seq:i+1,recipient:b.recipient.trim(),address:b.addr.trim()+', '+draft.toCity,mobile:b.mobile.trim(),
+      return {delivery_id:del.id,seq:i+1,recipient:b.recipient.trim(),address:b.addr.trim()+', '+draft.toCity,
+        mobile:'+'+normPhone(b.mobile,cc),
         lat:m?parseFloat(m[1]):null,lng:m?parseFloat(m[2]):null};});
     await sb.from('delivery_bags').insert(rows);
     await loadDeliveries();
