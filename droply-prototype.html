@@ -27,7 +27,9 @@
     --red:#F87171;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html{touch-action:manipulation;-webkit-text-size-adjust:100%}
+  html{touch-action:manipulation;-webkit-text-size-adjust:100%;
+    background:#04102A;overscroll-behavior:none;overscroll-behavior-x:none}
+  body{overscroll-behavior:none;overscroll-behavior-x:none;background:#04102A}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     background:#04102A;color:var(--ink);display:flex;justify-content:center;
     align-items:center;min-height:100vh;padding:24px}
@@ -1899,8 +1901,13 @@ if ('serviceWorker' in navigator) {
 }
 
 /* ---- Android back button / browser back = same as swipe back ---- */
-history.pushState({droply:1},'');
-window.addEventListener('popstate',()=>{ goBack(); history.pushState({droply:1},''); });
+/* push a few states so a native back gesture always lands inside the app
+   (never on a blank page) — we re-push immediately on every pop */
+for(let i=0;i<3;i++) history.pushState({droply:1},'');
+window.addEventListener('popstate',()=>{
+  history.pushState({droply:1},'');   // re-arm first, so we never navigate away
+  goBack();
+});
 
 /* ---- restore session on load: land straight in the app if already signed in ---- */
 (async () => {
