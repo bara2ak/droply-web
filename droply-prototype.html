@@ -285,6 +285,8 @@
   .tile .tile-d{font-size:11.5px;opacity:.8;margin-top:3px;line-height:1.35}
   .promo{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;
     padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .promo-img{margin-top:14px;border-radius:16px;overflow:hidden;border:1px solid var(--line);line-height:0}
+  .promo-img img{width:100%;height:auto;display:block}
   .promo-t{font-weight:800;font-size:15px}
   .promo-s{font-size:12.5px;color:var(--muted);margin-top:2px}
   .nav a svg{display:block}
@@ -483,6 +485,11 @@ async function loadDeliveries(){
     }
     deliveries=rows.map(mapDelivery);
   }catch(e){ console.error('loadDeliveries',e); }
+}
+let banners=[];
+async function loadBanners(){
+  try{ const {data}=await sb.from('banners').select('*').eq('active',true).order('sort').limit(5);
+    banners=data||[]; }catch(_){ banners=[]; }
 }
 async function loadDiscounts(){
   try{ const {data}=await sb.from('discounts').select('*').eq('active',true);
@@ -790,7 +797,8 @@ async function logout(){ if(notifChannel){sb.removeChannel(notifChannel);notifCh
   if(delChannel){sb.removeChannel(delChannel);delChannel=null;} await sb.auth.signOut();
   driver=null; customerUser=null; role=null; verifyEmail=null; notifications=[]; deliveries=[]; show('picker'); }
 function enterApp(){ tab='home'; screen='main'; resetDocs(); show('app'); render(); loadNotifications(); pushOnEnter();
-  loadDiscounts(); refreshAndRender(); subscribeDeliveries(); }
+  loadDiscounts(); loadBanners().then(()=>{ if(role==='customer'&&tab==='home'&&screen==='main') render(); });
+  refreshAndRender(); subscribeDeliveries(); }
 
 /* ---- phone-first auth: one page. Enter phone → log in, or register. ---- */
 let authStep='phone';      // 'phone' | 'login' | 'signup'
@@ -1055,16 +1063,25 @@ function custHome(){
         <div class="tile-d">Track your deliveries</div>
       </div>
     </div>
-    <div class="promo">
-      <div><div class="promo-t">Delivering made easy</div>
-        <div class="promo-s">Fast, secure and affordable</div></div>
-      <div style="font-size:30px">📦</div>
-    </div>`;
+    ${bannerHtml()}`;
   h+=`<div class="between" style="margin:20px 0 10px"><h2 style="margin:0">Recent Deliveries</h2>
       ${mine.length>3?`<a onclick="go('orders')" style="color:var(--brand);font-weight:700;font-size:13px;cursor:pointer">View All</a>`:''}</div>`;
   if(!mine.length) return h+emptyState('📭','No deliveries yet','Tap “Send” to send your first package.');
   recent.forEach(d=>h+=deliveryCard(d,'track'));
   return h;
+}
+function bannerHtml(){
+  if(!banners.length) return '';
+  const b=banners[0];
+  const open=b.link_url?`onclick="window.open('${esc(b.link_url)}','_blank')" style="cursor:pointer"`:'';
+  if(b.image_url){
+    return `<div class="promo-img" ${open}><img src="${esc(b.image_url)}" alt="${esc(b.title||'')}" loading="lazy"></div>`;
+  }
+  return `<div class="promo" ${open}>
+      <div><div class="promo-t">${esc(b.title||'')}</div>
+        <div class="promo-s">${esc(b.subtitle||'')}</div></div>
+      <div style="color:var(--brand)">${ic('box',30)}</div>
+    </div>`;
 }
 function custOrders(){
   const mine=myDeliveries();
