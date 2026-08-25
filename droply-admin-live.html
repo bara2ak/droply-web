@@ -312,7 +312,7 @@ function viewDeliveries(){
       <td>${esc(recTxt)}</td>
       <td>${esc(d.from_city)} → ${esc(d.to_city)}</td>
       <td>${esc(capName)}</td>
-      <td>${jod(d.price)}</td>
+      <td>${delMoney(d)}</td>
       <td><span class="pill p-${d.status==='delivered'?'verified':d.status==='cancelled'?'suspended':d.status==='pending'?'pending':'verified'}">${esc(d.status)}</span></td>
       <td><button class="mini b" onclick="openDelivery(${d.id})">Details</button></td></tr>`;
   }).join('') || `<tr><td class="empty" colspan="8">No deliveries match your search.</td></tr>`;
@@ -341,7 +341,7 @@ function openDelivery(id){
         <div style="font-size:13px;color:var(--muted)">📍 ${esc(b.address||'—')}</div>
         <div style="font-size:13px;color:var(--muted)">📞 ${esc(b.mobile||'—')}</div></div>`).join('')||'<div style="color:var(--muted)">—</div>'}
       <div class="two" style="margin-top:14px">
-        <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Price</div><b>${jod(d.price)}</b> · ${d.payment_method==='cod'?'💵 Cash':'💳 Online'}</div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Price</div><b>${delMoney(d)}</b> · ${d.payment_method==='cod'?'💵 Cash':'💳 Online'}</div>
         <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Status</div><b>${esc(d.status)}</b></div>
       </div>
       ${d.notes?`<div style="margin-top:12px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">Notes</div>${esc(d.notes)}</div>`:''}
@@ -574,7 +574,9 @@ function rpData(){
   const delivered=dels.filter(d=>d.status==='delivered');
   const revenue=delivered.reduce((s,d)=>s+Number(d.price||0),0);
   const commission=revenue*0.5;
-  return {dels,caps,custs,delivered,revenue,commission,
+  const byCur={};
+  delivered.forEach(d=>{ const c=d.currency||'JOD'; byCur[c]=(byCur[c]||0)+Number(d.price||0); });
+  return {dels,caps,custs,delivered,revenue,commission,byCur,
     cancelled:dels.filter(d=>d.status==='cancelled').length,
     active:dels.filter(d=>['pending','assigned','transit'].includes(d.status)).length};
 }
@@ -611,12 +613,12 @@ function rpOverall(){
   const r=rpData();
   return `<div class="kpis">
       ${kpiCard('📦 Deliveries',r.dels.length,`${r.delivered.length} delivered · ${r.active} active · ${r.cancelled} cancelled`)}
-      ${kpiCard('💰 Revenue',jod(r.revenue),'From delivered orders')}
+      ${kpiCard('💰 Revenue',Object.keys(r.byCur).length?Object.entries(r.byCur).map(([c,v])=>money(v,c)).join(' + '):money(0),'From delivered orders')}
       ${kpiCard('🚗 New captains',r.caps.length,'Registered in period')}
       ${kpiCard('🙂 New customers',r.custs.length,'Registered in period')}
     </div>
     <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
-      ${kpiCard('🏦 Droply share',jod(r.commission),'50% commission')}
+      ${kpiCard('🏦 Droply share',Object.keys(r.byCur).length?Object.entries(r.byCur).map(([c,v])=>money(v*0.5,c)).join(' + '):money(0),'50% commission')}
       ${kpiCard('✅ Completion rate',r.dels.length?Math.round(r.delivered.length/r.dels.length*100)+'%':'—','Delivered / total')}
       ${kpiCard('📈 Avg order',r.delivered.length?jod(r.revenue/r.delivered.length):'—','Per delivered order')}
     </div>
@@ -668,7 +670,7 @@ function rpDeliveries(){
   const rows=r.dels.slice(0,100).map(d=>{
     const cap=capOf(d);
     return `<tr><td>#${d.id}</td><td>${dstr(d.created_at)}</td><td>${esc(custOf(d))}</td>
-      <td>${esc(d.from_city)} → ${esc(d.to_city)}</td><td>${esc(cap)}</td><td>${jod(d.price)}</td><td>${esc(d.status)}</td></tr>`;}).join('')
+      <td>${esc(d.from_city)} → ${esc(d.to_city)}</td><td>${esc(cap)}</td><td>${delMoney(d)}</td><td>${esc(d.status)}</td></tr>`;}).join('')
     || `<tr><td class="empty" colspan="7">No deliveries in this period</td></tr>`;
   return `<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       ${kpiCard('📦 Total',r.dels.length,'In period')}
@@ -721,7 +723,7 @@ function rpFinancial(){
     || `<tr><td class="empty" colspan="4">No settlements in this period</td></tr>`;
   return `<div class="kpis">
       ${kpiCard('💰 Revenue',jod(r.revenue),`${r.delivered.length} delivered orders`)}
-      ${kpiCard('🏦 Droply share',jod(r.commission),'50% commission')}
+      ${kpiCard('🏦 Droply share',Object.keys(r.byCur).length?Object.entries(r.byCur).map(([c,v])=>money(v*0.5,c)).join(' + '):money(0),'50% commission')}
       ${kpiCard('🚗 Captains share',jod(r.revenue-r.commission),'50% to captains')}
       ${kpiCard('📈 Avg order',r.delivered.length?jod(r.revenue/r.delivered.length):'—','Per delivered order')}
     </div>

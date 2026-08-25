@@ -370,11 +370,24 @@ const COUNTRIES={
 };
 function citiesFor(code){ return (COUNTRIES[code]||COUNTRIES.JO).cities; }
 function countryOfUser(){ const u=currentUser(); return (u&&u.country)||'JO'; }
-const PRICE_SAME=3, PRICE_CROSS=6;   // JOD
 const COMMISSION=0.5;                 // Droply's cut of each delivery fee (50%)
-function priceFor(fromCity,toCity){ return fromCity===toCity?PRICE_SAME:PRICE_CROSS; }
+/* pricing: fixed base fare + per-km rate, per country */
+const PRICING={
+  JO:{base:2,  perKm:0.25, cur:'JOD'},
+  SA:{base:10, perKm:2.5,  cur:'SAR'},
+};
+function pricingFor(cc){ return PRICING[cc]||PRICING.JO; }
+function currencyOf(cc){ return pricingFor(cc).cur; }
+function priceForDistance(km,cc){ const p=pricingFor(cc); return round2(p.base + p.perKm*(km||0)); }
+function legKm(pickCoords,dropAddr){
+  const a=parseCoords(pickCoords), b=parseCoords(dropAddr);
+  if(!a||!b) return 0;
+  return haversine(a,b);
+}
 function round2(n){ return Math.round(n*100)/100; }
-function jod(n){ n=Math.round(n*100)/100; return n+' JOD'; }
+/* money: shows the right currency (falls back to the current user's country) */
+function money(n,cur){ n=Math.round(n*100)/100; return n+' '+(cur||currencyOf(countryOfUser())); }
+function jod(n,cur){ return money(n,cur); }   // alias kept for existing call sites
 /* discount codes (loaded from Supabase) */
 let DISCOUNTS=[];
 function findDiscount(code){return DISCOUNTS.find(d=>d.code===(code||'').trim().toUpperCase()&&d.active);}
@@ -389,7 +402,7 @@ function mapDelivery(r){
   return { id:r.id, owner:r.customer_id, fromCity:r.from_city, toCity:r.to_city,
     from:r.pickup_addr||'', pickCoords:coordStr(r.pickup_lat,r.pickup_lng),
     size:r.size, notes:r.notes||'', status:r.status, paymentMethod:r.payment_method||'cod',
-    basePrice:Number(r.base_price||0), price:Number(r.price||0), discountCode:r.discount_code,
+    basePrice:Number(r.base_price||0), price:Number(r.price||0), currency:r.currency||'JOD', distanceKm:Number(r.distance_km||0), discountCode:r.discount_code,
     captainId:r.captain_id, customerMobile:r.customer?r.customer.mobile:'',
     driver: r.captain_id ? {email:r.captain_id, name:(cap&&cap.profiles)?cap.profiles.full_name:'Captain', vehicle:cap?cap.vehicle:'', plate:cap?cap.plate:'', mobile:(cap&&cap.profiles)?cap.profiles.mobile:''} : null,
     bags:(r.delivery_bags||[]).slice().sort((a,b)=>(a.seq||0)-(b.seq||0)).map(b=>({recipient:b.recipient,addr:b.address,mobile:b.mobile})) };
@@ -963,7 +976,7 @@ function deliveryCard(d,action){
     <div class="between"><b>#${d.id} · ${n} bag${n>1?'s':''}</b>${pill(d.status)}</div>
     ${routeMini(d)}
     <div class="meta"><span>${SIZES[d.size].em} <b>${SIZES[d.size].label}</b></span>
-      <span><b>${jod(d.price)}</b>${d.discountCode?` <small style="color:var(--green);font-weight:700">🏷️${esc(d.discountCode)}</small>`:''}</span><span><b>${d.fromCity===d.toCity?'Same city':'Cross-city'}</b></span></div></div>`;
+      <span><b>${money(d.price,d.currency)}</b>${d.discountCode?` <small style="color:var(--green);font-weight:700">🏷️${esc(d.discountCode)}</small>`:''}</span><span><b>${d.distanceKm?d.distanceKm.toFixed(1)+' km':(d.fromCity===d.toCity?'Same city':'Cross-city')}</b></span></div></div>`;
 }
 function routeMini(d){
   const drops=d.bags||[];
@@ -1020,12 +1033,19 @@ function applyCode(){
   render();
 }
 function cityOpts(sel){return citiesFor(countryOfUser()).map(c=>`<option ${sel===c?'selected':''}>${c}</option>`).join('');}
+/* per-drop distance + price for the current draft */
+function draftLegs(){
+  const cc=countryOfUser();
+  return draft.bags.map(b=>{ const km=legKm(draft.pickCoords,b.addr);
+    return {km, price:priceForDistance(km,cc)}; });
+}
 function custCreate(){
-  const perBag=priceFor(draft.fromCity,draft.toCity);
+  const cc=countryOfUser(), P=pricingFor(cc), cur=P.cur;
+  const legs=draftLegs();
   const qty=draft.bags.length;
-  const same=draft.fromCity===draft.toCity;
+  const totalKm=round2(legs.reduce((s,l)=>s+l.km,0));
   const disc=draft.discountObj;
-  const base=perBag*qty;
+  const base=round2(legs.reduce((s,l)=>s+l.price,0));
   const final=applyDisc(base,disc);
   const multi=draft.multi;
   const bagFields=draft.bags.map((b,i)=>`
@@ -1084,15 +1104,23 @@ function custCreate(){
     </div>
     ${disc?`<div style="color:var(--green);font-size:12.5px;margin-top:7px;font-weight:700">✓ ${esc(disc.code)} applied — ${discLabel(disc)}
       <a onclick="draft.code='';draft.discountObj=null;render()" style="color:var(--red);margin-left:8px;cursor:pointer">Remove</a></div>`:''}
-    <div class="banner" style="margin:16px 0 12px;display:flex;align-items:center;justify-content:space-between">
-      <div><div class="bt">${qty} drop-off${qty>1?'s':''} · ${same?'Same city ('+esc(draft.fromCity)+')':esc(draft.fromCity)+' → '+esc(draft.toCity)}</div>
-        <div style="font-size:13px;opacity:.85;margin-top:2px">${jod(perBag)} × ${qty}${disc?' · '+esc(disc.code):''}</div></div>
-      <div style="text-align:right">${disc&&final!==base?`<div style="font-size:13px;opacity:.7;text-decoration:line-through">${jod(base)}</div>`:''}
-        <div class="bv">${jod(final)}</div></div></div>
+    <div class="card" style="margin-top:16px">
+      <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:8px">Price breakdown</div>
+      ${legs.map((l,i)=>`<div class="between" style="font-size:13px;padding:5px 0">
+          <span style="color:var(--muted)">${qty>1?'Drop '+(i+1)+' · ':''}${l.km?l.km.toFixed(1)+' km':'distance pending'}</span>
+          <b>${money(l.price,cur)}</b></div>`).join('')}
+      <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:7px;font-size:12px;color:var(--muted)">
+        ${money(P.base,cur)} base + ${money(P.perKm,cur)} per km${qty>1?' · each drop-off':''}</div>
+    </div>
+    <div class="banner" style="margin:12px 0;display:flex;align-items:center;justify-content:space-between">
+      <div><div class="bt">${qty} drop-off${qty>1?'s':''}${totalKm?' · '+totalKm.toFixed(1)+' km total':''}</div>
+        <div style="font-size:13px;opacity:.85;margin-top:2px">${esc(draft.fromCity)} → ${esc(draft.toCity)}${disc?' · '+esc(disc.code):''}</div></div>
+      <div style="text-align:right">${disc&&final!==base?`<div style="font-size:13px;opacity:.7;text-decoration:line-through">${money(base,cur)}</div>`:''}
+        <div class="bv">${money(final,cur)}</div></div></div>
     <div style="display:flex;gap:8px;background:var(--amber-soft);color:var(--amber);border-radius:12px;
       padding:11px 13px;font-size:12px;line-height:1.45;margin-bottom:12px;font-weight:600">
       <span>⚠️</span><span>We don't transport anything illegal or prohibited. By posting, you confirm your items comply with the law.</span></div>
-    <button class="btn" onclick="submitDelivery()">Post delivery · ${jod(final)}</button>
+    <button class="btn" onclick="submitDelivery()">Post delivery · ${money(final,cur)}</button>
     <div style="height:12px"></div>`;
 }
 async function submitDelivery(){
@@ -1101,7 +1129,10 @@ async function submitDelivery(){
     if(!b.recipient.trim()||!b.addr.trim()||!b.mobile.trim()){toast('Fill in all details for bag '+(i+1));return;}}
   const [plat,plng]=(draft.pickCoords||'').split(',').map(s=>parseFloat(s));
   const from='📍 Current location ('+draft.pickCoords+'), '+draft.fromCity;
-  const base=priceFor(draft.fromCity,draft.toCity)*draft.bags.length;
+  const cc=countryOfUser(), cur=currencyOf(cc);
+  const legs=draftLegs();
+  const base=round2(legs.reduce((s,l)=>s+l.price,0));
+  const totalKm=round2(legs.reduce((s,l)=>s+l.km,0));
   const disc=draft.discountObj;
   const price=applyDisc(base,disc);
   toast('Posting…');
@@ -1111,7 +1142,8 @@ async function submitDelivery(){
       from_city:draft.fromCity, to_city:draft.toCity, pickup_addr:from,
       pickup_lat:isNaN(plat)?null:plat, pickup_lng:isNaN(plng)?null:plng,
       size:draft.size, notes:draft.notes.trim(), payment_method:draft.paymentMethod,
-      status:'pending', base_price:base, price, discount_code:disc?disc.code:null }).select().single();
+      status:'pending', base_price:base, price, currency:cur, distance_km:totalKm,
+      discount_code:disc?disc.code:null }).select().single();
     if(error){toast(error.message);return;}
     const rows=draft.bags.map((b,i)=>{const m=(b.addr||'').match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/);
       return {delivery_id:del.id,seq:i+1,recipient:b.recipient.trim(),address:b.addr.trim()+', '+draft.toCity,mobile:b.mobile.trim(),
@@ -1145,7 +1177,7 @@ function custTrack(){
   }
   h+=`<div class="card">${routeMini(d)}
       <div class="meta"><span>${SIZES[d.size].em} <b>${SIZES[d.size].label}</b></span>
-      <span><b>${jod(d.price)}</b>${d.discountCode?` <small style="color:var(--green);font-weight:700">🏷️${esc(d.discountCode)}</small>`:''}</span><span><b>${d.fromCity===d.toCity?'Same city':'Cross-city'}</b></span></div></div>`;
+      <span><b>${money(d.price,d.currency)}</b>${d.discountCode?` <small style="color:var(--green);font-weight:700">🏷️${esc(d.discountCode)}</small>`:''}</span><span><b>${d.distanceKm?d.distanceKm.toFixed(1)+' km':(d.fromCity===d.toCity?'Same city':'Cross-city')}</b></span></div></div>`;
   if(d.driver){h+=`<div class="card"><div class="row">
       <div style="width:44px;height:44px;border-radius:50%;background:var(--brand-soft);
         display:flex;align-items:center;justify-content:center;font-size:20px">🧑‍✈️</div>
@@ -1272,7 +1304,7 @@ function driverJobs(){
   list.forEach(({d,dist})=>{
     const n=bagCount(d);
     h+=`<div class="card tap" onclick="openItem(${d.id},'jobDetail')">
-      <div class="between"><b>${jod(d.price)} · ${n} bag${n>1?'s':''}</b>
+      <div class="between"><b>${money(d.price,d.currency)} · ${n} bag${n>1?'s':''}</b>
         <span class="pill p-assigned">📍 ${dist.toFixed(1)} km</span></div>
       ${routeMini(d)}<div style="height:8px"></div>
       ${active?`<button class="btn sm" disabled style="opacity:.5">Finish current delivery first</button>`
@@ -1306,7 +1338,7 @@ function driverJob(){
     }
     h+=`<div class="card" style="display:flex;align-items:center;justify-content:space-between">
       <span style="font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Payment</span>
-      <span style="font-weight:800;font-size:14px;color:${cod?'var(--amber)':'var(--green)'}">${cod?'💵 Cash — collect '+jod(d.price):'💳 Paid online'}</span></div>`;
+      <span style="font-weight:800;font-size:14px;color:${cod?'var(--amber)':'var(--green)'}">${cod?'💵 Cash — collect '+money(d.price,d.currency):'💳 Paid online'}</span></div>`;
   }
   h+=`<div class="card"><small style="color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase">Drop-offs (${n})${picked?' — contact & navigate':''}</small>
       ${d.bags.map((b,i)=>`<div style="padding:11px 0;${i<n-1?'border-bottom:1px solid var(--line)':''}">
@@ -1320,7 +1352,7 @@ function driverJob(){
   if(!mine&&d.status==='pending'){
     h+= myActiveJob()
       ? `<div class="card" style="text-align:center;color:var(--muted);font-size:13px">Finish your current delivery before claiming another.</div>`
-      : `<button class="btn" onclick="claim(${d.id})">Claim this job · ${jod(d.price)}</button>`;
+      : `<button class="btn" onclick="claim(${d.id})">Claim this job · ${money(d.price,d.currency)}</button>`;
   }
   else if(d.status==='assigned'){
     h+=`<button class="btn" onclick="advance(${d.id})">Confirm pickup →</button>
@@ -1332,7 +1364,7 @@ function driverJob(){
     h+=`<a class="btn" href="${navUrl((d.bags[0]||{}).addr||d.toCity)}" target="_blank" rel="noopener"
         style="display:block;text-align:center;text-decoration:none">🧭 Navigate to drop-off</a>
       <div style="height:10px"></div>`;
-    if((d.paymentMethod||'cod')==='cod')h+=`<div class="card" style="text-align:center;background:var(--amber-soft);border-color:var(--amber);color:var(--amber);font-weight:700;font-size:13px">💵 Collect ${jod(d.price)} cash from the recipient</div>`;
+    if((d.paymentMethod||'cod')==='cod')h+=`<div class="card" style="text-align:center;background:var(--amber-soft);border-color:var(--amber);color:var(--amber);font-weight:700;font-size:13px">💵 Collect ${money(d.price,d.currency)} cash from the recipient</div>`;
     h+=`<button class="btn green" onclick="advance(${d.id})">Mark as delivered ✓</button>`;
   }
   else if(d.status==='delivered'){
@@ -1415,7 +1447,7 @@ function driverTrips(){
   if(!jobs.length)return h+emptyState('🚚','No trips yet','Claim a job from the Jobs tab to get started.');
   jobs.slice().reverse().forEach(d=>{
     h+=`<div class="card tap" onclick="openItem(${d.id},'jobDetail')">
-      <div class="between"><b>#${d.id} · ${jod(d.price)}</b>${pill(d.status)}</div>${routeMini(d)}</div>`;});
+      <div class="between"><b>#${d.id} · ${money(d.price,d.currency)}</b>${pill(d.status)}</div>${routeMini(d)}</div>`;});
   return h;
 }
 function driverEarnings(){
