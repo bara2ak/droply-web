@@ -301,6 +301,16 @@
   .delivered-s{color:var(--ink);opacity:.85;font-size:14px;margin-top:6px;line-height:1.5}
   .card.between{display:flex;align-items:center;justify-content:space-between}
 
+
+  /* ===== sponsor banner carousel ===== */
+  .carousel{margin-top:14px;overflow:hidden;position:relative}
+  .btrack{display:flex;transition:transform .45s cubic-bezier(.25,.8,.3,1);will-change:transform}
+  .bslide{min-width:100%;box-sizing:border-box}
+  .bslide img{width:100%;height:auto;display:block;border-radius:16px;border:1px solid var(--line)}
+  .bdots{display:flex;gap:6px;justify-content:center;margin-top:9px}
+  .bdot{width:7px;height:7px;border-radius:50%;background:var(--line);cursor:pointer;transition:all .2s}
+  .bdot.on{background:var(--brand);width:18px;border-radius:4px}
+
   /* ===== Arabic / RTL ===== */
   [dir=rtl]{ direction:rtl; }
   [dir=rtl] .route{ padding-left:0; padding-right:6px; }
@@ -498,7 +508,7 @@ async function loadDeliveries(){
 }
 let banners=[];
 async function loadBanners(){
-  try{ const {data}=await sb.from('banners').select('*').eq('active',true).order('sort').limit(5);
+  try{ const {data}=await sb.from('banners').select('*').eq('active',true).order('sort').limit(10);
     banners=data||[]; }catch(_){ banners=[]; }
 }
 async function loadDiscounts(){
@@ -1039,6 +1049,7 @@ function render(){
   const v=$('view');
   v.innerHTML = role==='customer'?renderCustomer():renderDriver();
   renderNav(); v.scrollTop=0; updateBell(); translateAll();
+  if(role==='customer'&&tab==='home'&&screen==='main') setTimeout(setupBannerSwipe,40);
   if(role==='customer'&&screen==='track') setTimeout(()=>setupTracking(selected),60);
   else stopTracking();
 }
@@ -1080,18 +1091,55 @@ function custHome(){
   recent.forEach(d=>h+=deliveryCard(d,'track'));
   return h;
 }
-function bannerHtml(){
-  if(!banners.length) return '';
-  const b=banners[0];
+let bannerIdx=0, bannerTimer=null;
+function bannerSlide(b){
   const open=b.link_url?`onclick="window.open('${esc(b.link_url)}','_blank')" style="cursor:pointer"`:'';
   if(b.image_url){
-    return `<div class="promo-img" ${open}><img src="${esc(b.image_url)}" alt="${esc(b.title||'')}" loading="lazy"></div>`;
+    return `<div class="bslide" ${open}><img src="${esc(b.image_url)}" alt="${esc(b.title||'')}" loading="lazy"></div>`;
   }
-  return `<div class="promo" ${open}>
+  return `<div class="bslide" ${open}><div class="promo" style="margin:0">
       <div><div class="promo-t">${esc(b.title||'')}</div>
         <div class="promo-s">${esc(b.subtitle||'')}</div></div>
-      <div style="color:var(--brand)">${ic('box',30)}</div>
+      <div style="color:var(--brand)">${ic('box',30)}</div></div></div>`;
+}
+function bannerHtml(){
+  if(!banners.length) return '';
+  if(banners.length===1) return `<div class="carousel"><div class="btrack" id="btrack">${bannerSlide(banners[0])}</div></div>`;
+  if(bannerIdx>=banners.length) bannerIdx=0;
+  return `<div class="carousel">
+      <div class="btrack" id="btrack">${banners.map(bannerSlide).join('')}</div>
+      <div class="bdots" id="bdots">${banners.map((_,i)=>`<span class="bdot ${i===bannerIdx?'on':''}" onclick="goBanner(${i})"></span>`).join('')}</div>
     </div>`;
+}
+function goBanner(i,userDriven){
+  const t=$('btrack'); if(!t)return;
+  bannerIdx=(i+banners.length)%banners.length;
+  t.style.transform=`translateX(${(lang==='ar'?1:-1)*bannerIdx*100}%)`;
+  const dots=$('bdots'); if(dots) [...dots.children].forEach((d,j)=>d.classList.toggle('on',j===bannerIdx));
+  if(userDriven) startBannerAuto();          // restart the timer after a manual swipe
+}
+function startBannerAuto(){
+  clearInterval(bannerTimer);
+  if(banners.length<2) return;
+  bannerTimer=setInterval(()=>{
+    if(!(role==='customer'&&tab==='home'&&screen==='main')||!$('btrack')){ clearInterval(bannerTimer); return; }
+    goBanner(bannerIdx+1);
+  },4500);
+}
+function setupBannerSwipe(){
+  const t=$('btrack'); if(!t||banners.length<2) return;
+  goBanner(bannerIdx);
+  let x0=0,y0=0,on=false;
+  t.addEventListener('touchstart',e=>{ if(e.touches.length!==1)return; on=true; x0=e.touches[0].clientX; y0=e.touches[0].clientY; },{passive:true});
+  t.addEventListener('touchend',e=>{
+    if(!on)return; on=false; const c=e.changedTouches[0]; if(!c)return;
+    const dx=c.clientX-x0, dy=c.clientY-y0;
+    if(Math.abs(dx)>40 && Math.abs(dx)>Math.abs(dy)*1.4){
+      const dir=(dx<0?1:-1)*(lang==='ar'?-1:1);
+      goBanner(bannerIdx+dir,true);
+    }
+  },{passive:true});
+  startBannerAuto();
 }
 function custOrders(){
   const mine=myDeliveries();
@@ -1794,10 +1842,65 @@ addLangToggleToPicker();
 document.querySelector('.phone').setAttribute('dir', lang==='ar'?'rtl':'ltr');
 if (lang==='ar') translateAll();
 
+
+/* ---- swipe from the screen edge to go back (RTL-aware) ---- */
+function anyOverlayOpen(){
+  return ($('mapOverlay')&&$('mapOverlay').classList.contains('show'))
+      || ($('notifPanel')&&$('notifPanel').classList.contains('show'))
+      || ($('osCenter')&&$('osCenter').classList.contains('show'));
+}
+function goBack(){
+  // 1) close whatever is on top first
+  if($('mapOverlay')&&$('mapOverlay').classList.contains('show')){ closeMap(); return true; }
+  if($('notifPanel')&&$('notifPanel').classList.contains('show')){ closeNotifs(); return true; }
+  if($('osCenter')&&$('osCenter').classList.contains('show')){ closeOSCenter(); return true; }
+  // 2) inside the app: any sub-screen returns to its tab
+  if(role && $('app').style.display!=='none'){
+    if(screen!=='main'){ screen='main'; selected=null; render(); return true; }
+    if(tab!=='home'){ go('home'); return true; }
+    return false;
+  }
+  // 3) in the auth flow: step back, then out to the role picker
+  if($('authScreen') && $('authScreen').style.display!=='none'){
+    if(verifyEmail){ verifyBack(); return true; }
+    if(authStep!=='phone'){ authStep='phone'; renderAuth(); return true; }
+    backToPicker(); return true;
+  }
+  return false;
+}
+(function enableEdgeSwipe(){
+  const EDGE=32, MIN=70;      // start zone (px) and distance needed
+  let sx=0, sy=0, tracking=false, t0=0;
+  const phone=document.querySelector('.phone'); if(!phone) return;
+  phone.addEventListener('touchstart', e=>{
+    if(e.touches.length!==1) return;
+    const rtl = document.querySelector('.phone').getAttribute('dir')==='rtl';
+    const r=phone.getBoundingClientRect();
+    const x=e.touches[0].clientX - r.left;
+    // back edge is the left in LTR, the right in RTL
+    tracking = rtl ? (x > r.width-EDGE) : (x < EDGE);
+    sx=e.touches[0].clientX; sy=e.touches[0].clientY; t0=Date.now();
+  }, {passive:true});
+  phone.addEventListener('touchend', e=>{
+    if(!tracking) return; tracking=false;
+    const t=e.changedTouches[0]; if(!t) return;
+    const dx=t.clientX-sx, dy=t.clientY-sy;
+    const rtl = document.querySelector('.phone').getAttribute('dir')==='rtl';
+    const far = rtl ? (dx < -MIN) : (dx > MIN);
+    const horizontal = Math.abs(dx) > Math.abs(dy)*1.6;
+    const quick = (Date.now()-t0) < 800;
+    if(far && horizontal && quick) goBack();
+  }, {passive:true});
+})();
+
 /* ---- register service worker (makes the app installable) ---- */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
+
+/* ---- Android back button / browser back = same as swipe back ---- */
+history.pushState({droply:1},'');
+window.addEventListener('popstate',()=>{ goBack(); history.pushState({droply:1},''); });
 
 /* ---- restore session on load: land straight in the app if already signed in ---- */
 (async () => {
