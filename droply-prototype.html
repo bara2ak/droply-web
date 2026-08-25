@@ -6,7 +6,7 @@
 <title>Droply — Package Delivery</title>
 <link rel="icon" type="image/png" href="droply-logo.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#2563eb">
+<meta name="theme-color" content="#07173A">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Droply">
@@ -17,21 +17,25 @@
 <script src="droply-config.js"></script>
 <style>
   :root{
-    --brand:#2563eb; --brand-dark:#1d4ed8; --brand-soft:#eff4ff;
-    --ink:#0f172a; --muted:#64748b; --line:#e5e9f0; --bg:#f5f7fb;
-    --green:#16a34a; --green-soft:#e9f9ef; --amber:#d97706; --amber-soft:#fdf3e7;
-    --red:#dc2626; --card:#ffffff;
+    /* Droply dark theme — deep navy + teal */
+    --brand:#2FD6C6; --brand-dark:#1FB9AA; --brand-soft:rgba(47,214,198,.14);
+    --accent:#2563eb;                      /* secondary blue tile */
+    --ink:#E9F1FB; --muted:#93A7C4; --line:#1E3A66; --bg:#07173A;
+    --card:#0E2450; --card-2:#122B5C;
+    --green:#34D399; --green-soft:rgba(52,211,153,.15);
+    --amber:#FBBF24; --amber-soft:rgba(251,191,36,.15);
+    --red:#F87171;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html{touch-action:manipulation;-webkit-text-size-adjust:100%}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    background:#e2e8f0;color:var(--ink);display:flex;justify-content:center;
+    background:#04102A;color:var(--ink);display:flex;justify-content:center;
     align-items:center;min-height:100vh;padding:24px}
   .phone{width:390px;height:800px;max-height:94vh;background:var(--bg);border-radius:44px;
-    box-shadow:0 30px 70px rgba(15,23,42,.35);position:relative;overflow:hidden;
-    border:11px solid #0f172a}
+    box-shadow:0 30px 70px rgba(0,0,0,.55);position:relative;overflow:hidden;
+    border:11px solid #050D22}
   .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:26px;
-    background:#0f172a;border-radius:0 0 18px 18px;z-index:60}
+    background:#050D22;border-radius:0 0 18px 18px;z-index:60}
   .statusbar{height:44px;display:flex;align-items:flex-end;justify-content:space-between;
     padding:0 26px 4px;font-size:13px;font-weight:600;color:var(--ink)}
   .screen{position:absolute;inset:0;top:44px;bottom:0;display:flex;flex-direction:column;overflow:hidden}
@@ -42,27 +46,27 @@
   .logo .dot{width:44px;height:40px;background:url('droply-logo.png') center/contain no-repeat;
     color:transparent;font-size:0}
   .role-tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
-    background:var(--brand-soft);color:var(--brand-dark);padding:5px 10px;border-radius:20px}
+    background:var(--brand-soft);color:var(--brand);padding:5px 10px;border-radius:20px}
   h1{font-size:22px;margin:4px 0 2px;letter-spacing:-.5px}
   h2{font-size:16px;margin:20px 0 10px}
   .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;
-    margin-bottom:12px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+    margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.25)}
   .card.tap{cursor:pointer;transition:transform .08s}
   .card.tap:active{transform:scale(.985)}
   .row{display:flex;align-items:center;gap:10px}
   .between{display:flex;align-items:center;justify-content:space-between}
   .pill{font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px;white-space:nowrap}
   .p-pending{background:var(--amber-soft);color:var(--amber)}
-  .p-assigned{background:var(--brand-soft);color:var(--brand-dark)}
-  .p-transit{background:#eef2ff;color:#4f46e5}
+  .p-assigned{background:var(--brand-soft);color:var(--brand)}
+  .p-transit{background:rgba(96,165,250,.16);color:#93C5FD}
   .p-done{background:var(--green-soft);color:var(--green)}
-  .p-cancel{background:#fee2e2;color:#dc2626}
+  .p-cancel{background:rgba(248,113,113,.16);color:var(--red)}
   .route{margin:12px 0 4px;padding-left:6px}
   .stop{display:flex;gap:11px;position:relative;padding-bottom:14px}
   .stop:last-child{padding-bottom:0}
   .stop .ic{width:22px;display:flex;flex-direction:column;align-items:center;flex-shrink:0}
-  .stop .ic .mark{width:11px;height:11px;border-radius:50%;border:2.5px solid var(--brand);background:#fff;z-index:2}
+  .stop .ic .mark{width:11px;height:11px;border-radius:50%;border:2.5px solid var(--brand);background:var(--bg);z-index:2}
   .stop.drop .ic .mark{border-color:var(--green)}
   .stop .ic .line{position:absolute;top:12px;width:2px;height:100%;background:var(--line)}
   .stop .txt small{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:700}
@@ -72,38 +76,40 @@
   label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:14px 0 6px;
     text-transform:uppercase;letter-spacing:.4px}
   input,select,textarea{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;
-    font-size:15px;font-family:inherit;background:#fff;color:var(--ink)}
+    font-size:15px;font-family:inherit;background:var(--card-2);color:var(--ink)}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand)}
   textarea{resize:none;height:70px}
   .seg{display:flex;gap:8px;margin-top:6px}
   .seg .opt{flex:1;text-align:center;padding:12px 4px;border:1.5px solid var(--line);border-radius:12px;
-    font-size:13px;font-weight:600;cursor:pointer;background:#fff}
-  .seg .opt.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)}
+    font-size:13px;font-weight:600;cursor:pointer;background:var(--card-2);color:var(--ink)}
+  .seg .opt.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
   .seg .opt .em{display:block;font-size:19px;margin-bottom:2px}
   .btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:15px;font-weight:700;
-    background:var(--brand);color:#fff;cursor:pointer;transition:transform .08s}
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--brand);color:#052A3A;cursor:pointer;transition:transform .08s}
   .btn:active{transform:scale(.98)}
-  .btn.ghost{background:var(--brand-soft);color:var(--brand-dark)}
+  .btn.ghost{background:var(--brand-soft);color:var(--brand);border:1px solid rgba(47,214,198,.35)}
+  .btn svg{flex-shrink:0}
   .btn.green{background:var(--green)}
-  .btn.outline{background:#fff;border:1.5px solid var(--line);color:var(--ink)}
-  .btn.danger{background:#fff;border:1.5px solid #fecaca;color:var(--red)}
-  .btn.sm{padding:11px;font-size:14px;border-radius:12px}
+  .btn.outline{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
+  .btn.danger{background:transparent;border:1.5px solid rgba(248,113,113,.5);color:var(--red)}
+  .btn.sm{padding:11px;font-size:14px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;gap:7px}
   .btn:disabled{opacity:.45}
-  .nav{position:absolute;bottom:0;left:0;right:0;height:74px;background:#fff;border-top:1px solid var(--line);
+  .nav{position:absolute;bottom:0;left:0;right:0;height:74px;background:var(--card);border-top:1px solid var(--line);
     display:flex;padding-bottom:8px;z-index:40}
   .nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
     color:var(--muted);font-size:10.5px;font-weight:600;cursor:pointer}
   .nav a .ni{font-size:21px}
   .nav a.on{color:var(--brand)}
-  .picker{position:absolute;inset:0;background:linear-gradient(160deg,#1e3a8a,#2563eb 55%,#3b82f6);
+  .picker{position:absolute;inset:0;background:linear-gradient(165deg,#04102A 0%,#0B2350 55%,#0E3A57 100%);
     display:flex;flex-direction:column;justify-content:center;padding:34px;color:#fff;z-index:50;overflow-y:auto}
   .picker .big{font-size:44px;font-weight:800;letter-spacing:-1.5px;display:flex;align-items:center;gap:12px}
   .picker .big .dot{width:92px;height:86px;background:url('droply-logo.png') center/contain no-repeat;
     color:transparent;font-size:0}
   .picker p{opacity:.9;font-size:15px;margin:14px 0 34px;line-height:1.5}
-  .rolecard{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.25);border-radius:20px;
+  .rolecard{background:rgba(47,214,198,.10);border:1px solid rgba(47,214,198,.30);border-radius:20px;
     padding:20px;margin-bottom:14px;cursor:pointer;transition:background .15s}
-  .rolecard:active{background:rgba(255,255,255,.24)}
+  .rolecard:active{background:rgba(47,214,198,.20)}
   .rolecard .rc-t{font-size:19px;font-weight:700;display:flex;align-items:center;gap:11px}
   .rolecard .rc-s{opacity:.85;font-size:13px;margin-top:6px;padding-left:37px}
   .rc-em{font-size:26px}
@@ -111,12 +117,12 @@
   .empty .e-em{font-size:44px;display:block;margin-bottom:12px;opacity:.5}
   .back{background:none;border:none;font-size:15px;color:var(--brand);font-weight:700;cursor:pointer;
     padding:6px 0;display:flex;align-items:center;gap:6px}
-  .switch{position:absolute;top:52px;right:16px;z-index:45;background:rgba(15,23,42,.06);border:none;
+  .switch{position:absolute;top:52px;right:16px;z-index:45;background:rgba(255,255,255,.08);border:none;
     border-radius:20px;padding:6px 11px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer}
-  .banner{background:var(--brand);color:#fff;border-radius:16px;padding:16px;margin-bottom:14px}
+  .banner{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#04283A;border-radius:16px;padding:16px;margin-bottom:14px}
   .banner .bt{font-size:13px;opacity:.85}
   .banner .bv{font-size:26px;font-weight:800;margin-top:2px}
-  .toast{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;
+  .toast{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:#04102A;color:#fff;border:1px solid var(--line);
     padding:11px 18px;border-radius:24px;font-size:13px;font-weight:600;z-index:70;opacity:0;
     pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
@@ -125,8 +131,8 @@
   .stat .box .v{font-size:20px;font-weight:800}
   .stat .box .l{font-size:11px;color:var(--muted);margin-top:2px}
   .map{height:150px;border-radius:16px;margin-bottom:14px;position:relative;overflow:hidden;
-    background:linear-gradient(90deg,#dfe6f0 1px,transparent 1px) 0 0/34px 34px,
-      linear-gradient(0deg,#dfe6f0 1px,transparent 1px) 0 0/34px 34px,#eef2f8;border:1px solid var(--line)}
+    background:linear-gradient(90deg,rgba(47,214,198,.10) 1px,transparent 1px) 0 0/34px 34px,
+      linear-gradient(0deg,rgba(47,214,198,.10) 1px,transparent 1px) 0 0/34px 34px,#0B1F45;border:1px solid var(--line)}
   .map .pin{position:absolute;font-size:22px}
   .map .pinA{top:24px;left:30px}
   .map .pinB{bottom:22px;right:34px}
@@ -140,10 +146,10 @@
     background:url('droply-logo.png') center/contain no-repeat;color:transparent;font-size:0}
   .auth h1{text-align:center;font-size:24px;margin:14px 0 4px}
   .auth .sub{text-align:center}
-  .tabs{display:flex;background:#eef2f8;border-radius:12px;padding:4px;margin:6px 0 4px}
+  .tabs{display:flex;background:var(--card-2);border-radius:12px;padding:4px;margin:6px 0 4px}
   .tabs button{flex:1;border:none;background:none;padding:10px;border-radius:9px;font-weight:700;
     font-size:14px;color:var(--muted);cursor:pointer}
-  .tabs button.on{background:#fff;color:var(--brand-dark);box-shadow:0 1px 3px rgba(15,23,42,.1)}
+  .tabs button.on{background:var(--brand);color:#052A3A;box-shadow:none}
   .demo{text-align:center;font-size:12px;color:var(--muted);margin-top:14px}
   .demo a{color:var(--brand);font-weight:700;cursor:pointer;text-decoration:underline}
   .avatar{width:64px;height:64px;border-radius:50%;background:var(--brand-soft);display:flex;
@@ -156,7 +162,7 @@
   .two>div{flex:1}
   .upl{display:flex;align-items:center;gap:12px;border:1.5px dashed var(--line);border-radius:12px;
     padding:13px 14px;cursor:pointer;margin-top:8px;transition:border-color .15s,background .15s}
-  .upl:active{background:#f8fafc}
+  .upl:active{background:var(--card-2)}
   .upl.done{border-style:solid;border-color:var(--green);background:var(--green-soft)}
   .upl .upl-ic{font-size:22px;flex-shrink:0}
   .upl .upl-txt{flex:1;min-width:0}
@@ -166,7 +172,7 @@
   .upl.done .upl-status{color:var(--green);font-weight:700}
   .upl .chev{color:var(--muted);font-size:16px}
   .note{background:var(--brand-soft);border-radius:12px;padding:12px 14px;font-size:12.5px;
-    color:var(--brand-dark);margin:14px 0;line-height:1.45}
+    color:var(--brand);margin:14px 0;line-height:1.45}
   .vbadge{display:inline-flex;align-items:center;gap:5px;background:var(--green-soft);color:var(--green);
     font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px}
   .checklist{list-style:none;padding:0;margin:12px 0}
@@ -178,18 +184,18 @@
   .pfp .img{width:88px;height:88px;border-radius:50%;background:var(--brand-soft);display:flex;
     align-items:center;justify-content:center;font-size:40px;overflow:hidden;background-size:cover;background-position:center}
   .pfp .cam{position:absolute;bottom:0;right:0;width:30px;height:30px;border-radius:50%;background:var(--brand);
-    color:#fff;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
+    color:#052A3A;border:3px solid var(--card);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
   /* bag stepper + bag cards */
   .stepper{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;width:fit-content;margin-top:6px}
-  .stepper button{width:48px;height:48px;border:none;background:#fff;font-size:22px;font-weight:700;color:var(--brand);cursor:pointer}
+  .stepper button{width:48px;height:48px;border:none;background:var(--card-2);font-size:22px;font-weight:700;color:var(--brand);cursor:pointer}
   .stepper button:disabled{color:var(--line)}
   .stepper .qv{width:56px;text-align:center;font-size:18px;font-weight:800}
-  .bagcard{border:1.5px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px;background:#fbfcfe}
-  .bagcard .bh{font-size:12px;font-weight:800;color:var(--brand-dark);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+  .bagcard{border:1.5px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px;background:var(--card-2)}
+  .bagcard .bh{font-size:12px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
   .bagcard label{margin:8px 0 4px}
   .bagcard input{padding:11px 12px;font-size:14px}
   /* map picker */
-  .mapoverlay{position:absolute;inset:0;z-index:80;background:#fff;display:none;flex-direction:column}
+  .mapoverlay{position:absolute;inset:0;z-index:80;background:var(--bg);display:none;flex-direction:column}
   .mapoverlay.show{display:flex}
   .maphead{padding:14px 16px;font-weight:700;font-size:15px;border-bottom:1px solid var(--line);
     display:flex;align-items:center;justify-content:space-between}
@@ -201,22 +207,22 @@
   .mapfoot{padding:13px 16px;border-top:1px solid var(--line)}
   .mapfoot .co{font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px}
   /* notifications */
-  .bell{position:relative;background:rgba(15,23,42,.05);border:none;width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .bell{position:relative;background:rgba(255,255,255,.07);border:none;width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .ndot{position:absolute;top:5px;right:5px;min-width:16px;height:16px;padding:0 3px;background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:9px;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
   .ndot.show{display:flex}
   .notifpanel{position:absolute;inset:0;top:44px;z-index:75;background:var(--bg);display:none;flex-direction:column}
   .notifpanel.show{display:flex}
-  .notifhead{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);font-weight:800;font-size:17px;background:#fff}
+  .notifhead{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);font-weight:800;font-size:17px;background:var(--card)}
   .notifhead a{color:var(--muted);font-size:24px;cursor:pointer;line-height:1}
   .notiflist{flex:1;overflow-y:auto;padding:12px 16px}
-  .nitem{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px;display:flex;gap:11px}
+  .nitem{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px;display:flex;gap:11px}
   .nitem.unread{border-color:var(--brand);background:var(--brand-soft)}
   .nitem .nic{font-size:22px;flex-shrink:0}
   .nitem .ntitle{font-weight:700;font-size:14px}
   .nitem .nbody{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.4}
   .nitem .ntime{font-size:11px;color:var(--muted);margin-top:5px}
   /* on-screen push banner */
-  .push{position:absolute;top:8px;left:10px;right:10px;z-index:90;background:#fff;border:1px solid var(--line);
+  .push{position:absolute;top:8px;left:10px;right:10px;z-index:90;background:var(--card);border:1px solid var(--line);
     border-radius:18px;box-shadow:0 12px 32px rgba(15,23,42,.25);padding:11px 13px;display:flex;gap:11px;align-items:center;
     transform:translateY(-160%);opacity:0;transition:transform .38s cubic-bezier(.2,.85,.25,1),opacity .3s;cursor:pointer}
   .push.show{transform:translateY(0);opacity:1}
@@ -227,18 +233,18 @@
   .push .push-app{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
   /* phone notification center (lock-screen shade) */
   .statusbar{cursor:pointer}
-  .oscenter{position:absolute;inset:0;z-index:95;background:linear-gradient(180deg,#0f172a,#1e293b);
+  .oscenter{position:absolute;inset:0;z-index:95;background:linear-gradient(180deg,#04102A,#0B1F45);
     display:none;flex-direction:column;transform:translateY(-100%);transition:transform .4s cubic-bezier(.2,.85,.25,1)}
   .oscenter.show{display:flex;transform:translateY(0)}
   .oscenter .osclock{text-align:center;color:#fff;padding:40px 0 16px}
   .oscenter .osclock .t{font-size:54px;font-weight:300;letter-spacing:1px}
   .oscenter .osclock .d{font-size:14px;opacity:.8;margin-top:2px}
   .oscenter .oslist{flex:1;overflow-y:auto;padding:6px 12px 12px}
-  .oscenter .oscard{background:rgba(255,255,255,.94);border-radius:16px;padding:11px 13px;margin-bottom:9px;display:flex;gap:10px;align-items:flex-start}
+  .oscenter .oscard{background:var(--card);color:var(--ink);border-radius:16px;padding:11px 13px;margin-bottom:9px;display:flex;gap:10px;align-items:flex-start}
   .oscenter .oscard .ic{font-size:22px;flex-shrink:0}
   .oscenter .oscard .head{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
   .oscenter .oscard .t{font-weight:700;font-size:13.5px;margin-top:1px}
-  .oscenter .oscard .b{font-size:12.5px;color:#334155;margin-top:1px;line-height:1.35}
+  .oscenter .oscard .b{font-size:12.5px;color:var(--muted);margin-top:1px;line-height:1.35}
   .oscenter .osgrab{width:130px;height:5px;background:rgba(255,255,255,.45);border-radius:3px;margin:8px auto}
   .oscenter .oshint{text-align:center;color:rgba(255,255,255,.6);font-size:12px;padding:0 0 14px}
 
@@ -264,6 +270,24 @@
   /* iOS installed PWA: env() safe-area is unreliable, so guarantee clearance */
   html.ios-pwa .nav{ position:static !important; padding-top:8px !important; padding-bottom:34px !important; height:auto !important; min-height:auto !important; }
   html.ios-pwa .screen{ padding-top:max(14px, env(safe-area-inset-top)); }
+
+
+  /* ===== home action tiles (mockup style) ===== */
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+  .tile{border-radius:18px;padding:16px;cursor:pointer;transition:transform .08s;min-height:132px;
+    display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .tile:active{transform:scale(.98)}
+  .tile.teal{background:linear-gradient(150deg,#1FA79B,#178E86);color:#EAFFFB}
+  .tile.blue{background:linear-gradient(150deg,#2C55E8,#1D3FBF);color:#EAF0FF}
+  .tile .tile-ic{position:absolute;top:14px;right:14px;opacity:.9}
+  .tile .tile-t{font-size:20px;font-weight:800;letter-spacing:-.3px}
+  .tile .tile-s{font-size:13px;font-weight:700;margin-top:6px;opacity:.95}
+  .tile .tile-d{font-size:11.5px;opacity:.8;margin-top:3px;line-height:1.35}
+  .promo{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .promo-t{font-weight:800;font-size:15px}
+  .promo-s{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .nav a svg{display:block}
 
   /* ===== Arabic / RTL ===== */
   [dir=rtl]{ direction:rtl; }
@@ -305,7 +329,7 @@
     <div class="topbar">
       <div class="logo"><span class="dot">▸</span>Droply</div>
       <div style="display:flex;align-items:center;gap:10px">
-        <button class="bell" onclick="openNotifs()">🔔<span class="ndot" id="nDot">0</span></button>
+        <button class="bell" onclick="openNotifs()"><span id="bellIc"></span><span class="ndot" id="nDot">0</span></button>
         <span class="role-tag" id="roleTag">Customer</span>
       </div>
     </div>
@@ -485,6 +509,37 @@ function onDeliveryChange(){
 }
 let draft={fromCity:'Amman',pickAddr:'',pickCoords:'',toCity:'Amman',multi:false,bags:[{recipient:'',addr:'',mobile:''}],size:'medium',notes:'',code:'',discountObj:null,paymentMethod:'cod'};
 
+
+/* ---- line icons (stroke = currentColor) ---- */
+const ICONS={
+  home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/>',
+  orders:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  profile:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/>',
+  send:'<path d="M21 3 10.5 13.5"/><path d="M21 3l-6.8 18-3.7-7.5L3 9.8 21 3z"/>',
+  pin:'<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
+  bell:'<path d="M18 8a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8z"/><path d="M10.5 20a2 2 0 0 0 3 0"/>',
+  jobs:'<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/><path d="M3 12h18"/>',
+  truck:'<path d="M3 16V6h11v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/>',
+  wallet:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><circle cx="17" cy="14" r="1.4"/>',
+  phone:'<path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 6.5 6.5L17 13l4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 6.2 2 2 0 0 1 6.5 3z"/>',
+  chat:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5.2A8 8 0 1 1 21 12z"/>',
+  nav:'<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11l4.5-2.5z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  box:'<path d="M21 8.5 12 4 3 8.5v7L12 20l9-4.5v-7z"/><path d="M3 8.5 12 13l9-4.5M12 13v7"/>',
+  map:'<path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13M15 6.5v13"/>',
+  gps:'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/>',
+  cash:'<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/>',
+  card:'<rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.5 2"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',
+};
+function ic(name,size,stroke){
+  const d=ICONS[name]||ICONS.box;
+  return `<svg viewBox="0 0 24 24" width="${size||20}" height="${size||20}" fill="none"
+    stroke="currentColor" stroke-width="${stroke||1.8}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+}
+
 /* ---------------- HELPERS ---------------- */
 const $=id=>document.getElementById(id);
 const esc=s=>(s||'').replace(/</g,'&lt;');
@@ -510,7 +565,7 @@ const AR = {
   // nav / tabs
   "Home":"الرئيسية","Send":"إرسال","Profile":"الملف","Jobs":"الطلبات","My trips":"رحلاتي","Earnings":"الأرباح",
   // customer home
-  "Your deliveries":"طلباتك","Active":"نشطة","Completed":"مكتملة","＋ New delivery":"＋ طلب جديد","New delivery":"طلب جديد",
+  "Your deliveries":"طلباتك","Active":"نشطة","Completed":"مكتملة","New delivery":"طلب جديد","New delivery":"طلب جديد",
   "No deliveries yet":"لا توجد طلبات بعد","Same city":"نفس المدينة","Cross-city":"بين المدن",
   // statuses
   "Looking for captain":"البحث عن كابتن","Captain assigned":"تم تعيين كابتن","In transit":"قيد التوصيل","Delivered":"تم التوصيل","Cancelled":"ملغى",
@@ -519,14 +574,14 @@ const AR = {
   "Small":"صغير","Medium":"متوسط","Payment method":"طريقة الدفع","Cash on delivery":"الدفع عند الاستلام","Pay online":"الدفع أونلاين",
   "Notes for captain (optional)":"ملاحظات للكابتن (اختياري)","Discount code (optional)":"كود خصم (اختياري)","Apply":"تطبيق","Update":"تحديث",
   "Recipient name":"اسم المستلم","Drop-off location":"موقع التسليم","Recipient mobile":"جوال المستلم","Choose on map":"اختر على الخريطة","Change":"تغيير",
-  "Sending items to multiple addresses":"إرسال لعناوين متعددة","＋ Add another address":"＋ إضافة عنوان آخر","Use my current location":"استخدم موقعي الحالي","Use GPS":"استخدام GPS",
+  "Sending items to multiple addresses":"إرسال لعناوين متعددة","Add another address":"＋ إضافة عنوان آخر","Use my current location":"استخدم موقعي الحالي","Use GPS":"استخدام GPS",
   // tracking
   "Cancel delivery":"إلغاء الطلب","Progress":"التقدّم","Delivery posted":"تم نشر الطلب","Picked up & in transit":"تم الاستلام وقيد التوصيل",
-  "Finding a nearby captain…":"جارٍ البحث عن كابتن قريب…","Delivery cancelled":"تم إلغاء الطلب","Your captain":"الكابتن الخاص بك","📞 Call captain":"📞 اتصل بالكابتن",
+  "Finding a nearby captain…":"جارٍ البحث عن كابتن قريب…","Delivery cancelled":"تم إلغاء الطلب","Your captain":"الكابتن الخاص بك","Call captain":"📞 اتصل بالكابتن",
   // captain
   "Enable your location":"فعّل موقعك","Enable location":"تفعيل الموقع","Claim this job":"استلام هذا الطلب","Confirm pickup →":"تأكيد الاستلام →",
-  "Cancel claim":"إلغاء الاستلام","Mark as delivered ✓":"تحديد كمُسلَّم ✓","🧭 Navigate to pickup":"🧭 التنقل إلى الاستلام","🧭 Navigate to drop-off":"🧭 التنقل إلى التسليم",
-  "Pickup":"الاستلام","Payment":"الدفع","Contact pickup customer":"التواصل مع العميل","Contact customer":"التواصل مع العميل","📞 Call":"📞 اتصال","💬 WhatsApp":"💬 واتساب",
+  "Cancel claim":"إلغاء الاستلام","Mark as delivered ✓":"تحديد كمُسلَّم ✓","Navigate to pickup":"🧭 التنقل إلى الاستلام","Navigate to drop-off":"🧭 التنقل إلى التسليم",
+  "Pickup":"الاستلام","Payment":"الدفع","Contact pickup customer":"التواصل مع العميل","Contact customer":"التواصل مع العميل","Call":"📞 اتصال","WhatsApp":"💬 واتساب",
   "No trips yet":"لا توجد رحلات بعد","No open jobs right now":"لا توجد طلبات متاحة الآن","Your net earnings":"صافي أرباحك","Owed to Droply":"مستحق لـ Droply",
   "I've transferred — submit proof":"لقد حوّلت — إرسال الإثبات","Your transfers":"تحويلاتك","Under review":"قيد المراجعة","Approved":"موافق عليه","Rejected":"مرفوض",
   "Transfer to Droply":"التحويل إلى Droply","Amount you transferred (JOD)":"المبلغ الذي حوّلته (دينار)","Submit for review":"إرسال للمراجعة","Proof of transfer":"إثبات التحويل",
@@ -631,8 +686,8 @@ function setLang(l){
 }
 function langToggleHtml(){
   return `<div style="display:flex;gap:8px;justify-content:center;margin-bottom:22px">
-    <button onclick="setLang('en')" style="background:${lang==='en'?'#fff':'rgba(255,255,255,.15)'};color:${lang==='en'?'#2563eb':'#fff'};border:1px solid rgba(255,255,255,.4);border-radius:20px;padding:6px 16px;font-weight:700;cursor:pointer">English</button>
-    <button onclick="setLang('ar')" style="background:${lang==='ar'?'#fff':'rgba(255,255,255,.15)'};color:${lang==='ar'?'#2563eb':'#fff'};border:1px solid rgba(255,255,255,.4);border-radius:20px;padding:6px 16px;font-weight:700;cursor:pointer">العربية</button>
+    <button onclick="setLang('en')" style="background:${lang==='en'?'var(--brand)':'rgba(255,255,255,.10)'};color:${lang==='en'?'#052A3A':'#fff'};border:1px solid rgba(255,255,255,.4);border-radius:20px;padding:6px 16px;font-weight:700;cursor:pointer">English</button>
+    <button onclick="setLang('ar')" style="background:${lang==='ar'?'var(--brand)':'rgba(255,255,255,.10)'};color:${lang==='ar'?'#052A3A':'#fff'};border:1px solid rgba(255,255,255,.4);border-radius:20px;padding:6px 16px;font-weight:700;cursor:pointer">العربية</button>
   </div>`;
 }
 function addLangToggleToPicker(){
@@ -700,7 +755,8 @@ function myNotifs(){
   return [];
 }
 function unreadCount(){ return myNotifs().filter(n=>!n.read).length; }
-function updateBell(){ const el=$('nDot'); if(!el)return; const c=unreadCount(); el.textContent=c>9?'9+':c; el.classList.toggle('show',c>0); }
+function updateBell(){ const b=$('bellIc'); if(b&&!b.innerHTML) b.innerHTML=ic('bell',18);
+  const el=$('nDot'); if(!el)return; const c=unreadCount(); el.textContent=c>9?'9+':c; el.classList.toggle('show',c>0); }
 function relTime(ts){ const s=(Date.now()-ts)/1000; if(s<60)return 'just now'; const m=Math.floor(s/60); if(m<60)return m+'m ago'; const h=Math.floor(m/60); if(h<24)return h+'h ago'; return Math.floor(h/24)+'d ago'; }
 function renderNotifsList(){
   const list=myNotifs(), el=$('notifList');
@@ -762,7 +818,7 @@ function renderAuth(){
       </select>
       <label>Mobile number</label>
       <div style="display:flex;gap:8px;align-items:center">
-        <div style="padding:13px 12px;border:1.5px solid var(--line);border-radius:12px;background:#fff;font-weight:700;white-space:nowrap">${C.flag} +${C.dial}</div>
+        <div style="padding:13px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--card-2);font-weight:700;white-space:nowrap">${C.flag} +${C.dial}</div>
         <input id="a_phone" type="tel" inputmode="numeric" placeholder="${C.ph}" value="${esc(authPhone)}" style="flex:1">
       </div>
       <p style="font-size:12px;color:var(--muted);margin:8px 0 0">We'll check if you already have an account.</p>
@@ -974,15 +1030,47 @@ function renderCustomer(){
   if(tab==='profile') return screen==='settings'?editProfile():profile();
   if(screen==='create'||tab==='new') return custCreate();
   if(screen==='track') return custTrack();
+  if(tab==='orders') return custOrders();
   return custHome();
 }
 function myDeliveries(){return deliveries.filter(d=>d.owner===customerUser.id);}
 function custHome(){
   const mine=myDeliveries();
+  const active=mine.filter(d=>d.status!=='delivered'&&d.status!=='cancelled');
+  const recent=mine.slice(0,3);
+  const latestActive=active[0];
+  let h=`<h1 style="font-size:24px">Hello, ${esc(customerUser.name.split(' ')[0])} 👋</h1>
+    <p class="sub">What would you like to do today?</p>
+    <div class="tiles">
+      <div class="tile teal" onclick="startCreate()">
+        <div class="tile-ic">${ic('send',26)}</div>
+        <div class="tile-t">Send</div>
+        <div class="tile-s">Send Package</div>
+        <div class="tile-d">Deliver anything to anywhere</div>
+      </div>
+      <div class="tile blue" onclick="${latestActive?`openItem(${latestActive.id},'track')`:`go('orders')`}">
+        <div class="tile-ic">${ic('pin',26)}</div>
+        <div class="tile-t">Track</div>
+        <div class="tile-s">Live Tracking</div>
+        <div class="tile-d">Track your deliveries</div>
+      </div>
+    </div>
+    <div class="promo">
+      <div><div class="promo-t">Delivering made easy</div>
+        <div class="promo-s">Fast, secure and affordable</div></div>
+      <div style="font-size:30px">📦</div>
+    </div>`;
+  h+=`<div class="between" style="margin:20px 0 10px"><h2 style="margin:0">Recent Deliveries</h2>
+      ${mine.length>3?`<a onclick="go('orders')" style="color:var(--brand);font-weight:700;font-size:13px;cursor:pointer">View All</a>`:''}</div>`;
+  if(!mine.length) return h+emptyState('📭','No deliveries yet','Tap “Send” to send your first package.');
+  recent.forEach(d=>h+=deliveryCard(d,'track'));
+  return h;
+}
+function custOrders(){
+  const mine=myDeliveries();
   const active=mine.filter(d=>d.status!=='delivered'&&d.status!=='cancelled'), done=mine.filter(d=>d.status==='delivered'||d.status==='cancelled');
-  let h=`<h1>Your deliveries</h1><p class="sub">Hi ${esc(customerUser.name.split(' ')[0])} — track packages you've sent</p>`;
-  h+=`<div class="card tap" onclick="startCreate()" style="border-style:dashed;border-color:var(--brand);color:var(--brand-dark);text-align:center;font-weight:700">＋ New delivery</div>`;
-  if(!mine.length) return h+emptyState('📭','No deliveries yet','Tap “New delivery” to send your first package.');
+  let h=`<h1>Your deliveries</h1><p class="sub">All packages you've sent</p>`;
+  if(!mine.length) return h+emptyState('📭','No deliveries yet','Tap “Send” to send your first package.');
   if(active.length){h+=`<h2>Active</h2>`;active.forEach(d=>h+=deliveryCard(d,'track'));}
   if(done.length){h+=`<h2>Completed</h2>`;done.forEach(d=>h+=deliveryCard(d,'track'));}
   return h;
@@ -1082,7 +1170,7 @@ function custCreate(){
           <span style="font-size:18px">📍</span>
           <div style="flex:1;font-size:13px">${esc(b.addr)}</div>
           <a onclick="chooseOnMap(${i})" style="color:var(--brand);font-weight:700;cursor:pointer;font-size:12.5px">Change</a></div>`
-        :`<button class="btn ghost sm" style="width:auto;margin-top:6px;padding:10px 14px" onclick="chooseOnMap(${i})">🗺️ Choose on map</button>`}
+        :`<button class="btn ghost sm" style="width:auto;margin-top:6px;padding:10px 14px" onclick="chooseOnMap(${i})">${ic('map',16)} Choose on map</button>`}
       <label>Recipient mobile</label>
       <input type="tel" placeholder="+${COUNTRIES[cc].dial} ${COUNTRIES[cc].ph}" value="${esc(b.mobile)}" oninput="draft.bags[${i}].mobile=this.value">
     </div>`).join('');
@@ -1096,11 +1184,11 @@ function custCreate(){
         <div style="flex:1"><b style="font-size:14px">${draft.pickAddr==='Pinned on map'?'Pinned on map':'Current location detected'}</b>
           <div style="font-size:12px;color:var(--muted)">${esc(draft.pickCoords)}</div></div></div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn ghost sm" style="flex:1;width:auto" onclick="locateMe()">📍 Use GPS</button>
-        <button class="btn ghost sm" style="flex:1;width:auto" onclick="chooseOnMap()">🗺️ Choose on map</button></div>`
+        <button class="btn ghost sm" style="flex:1;width:auto" onclick="locateMe()">${ic('gps',16)} Use GPS</button>
+        <button class="btn ghost sm" style="flex:1;width:auto" onclick="chooseOnMap()">${ic('map',16)} Choose on map</button></div>`
       :`<div style="display:flex;gap:8px">
-        <button class="btn ghost sm" style="flex:1;width:auto" onclick="locateMe()">📍 Current location</button>
-        <button class="btn ghost sm" style="flex:1;width:auto" onclick="chooseOnMap()">🗺️ Choose on map</button></div>
+        <button class="btn ghost sm" style="flex:1;width:auto" onclick="locateMe()">${ic('gps',16)} Current location</button>
+        <button class="btn ghost sm" style="flex:1;width:auto" onclick="chooseOnMap()">${ic('map',16)} Choose on map</button></div>
         <p style="font-size:12px;color:var(--muted);margin:7px 0 0">Use your GPS or drop a pin on the map — no typing needed.</p>`}
     <label>Drop-off city${multi?' (same for all addresses)':''}</label>
     <select onchange="draft.toCity=this.value;render()">${cityOpts(draft.toCity)}</select>
@@ -1108,7 +1196,7 @@ function custCreate(){
       <input type="checkbox" ${multi?'checked':''} onchange="toggleMulti()" style="width:18px;height:18px;accent-color:var(--brand)">
       Sending items to multiple addresses</label>
     ${bagFields}
-    ${multi?`<button class="btn ghost sm" style="margin-top:10px" onclick="addAddress()">＋ Add another address</button>`:''}
+    ${multi?`<button class="btn ghost sm" style="margin-top:10px" onclick="addAddress()">${ic('plus',15)} Add another address</button>`:''}
     <label>Package size</label>
     <div class="seg">${Object.entries(SIZES).map(([k,v])=>
       `<div class="opt ${draft.size===k?'on':''}" onclick="draft.size='${k}';render()">
@@ -1188,16 +1276,16 @@ function custTrack(){
         <div><div class="bt">${d.status==='assigned'?'Captain heading to pickup':'On the way to drop-off'}</div>
           <div style="font-size:12px;opacity:.85;margin-top:2px">🟢 Live tracking</div></div>
         <div id="etaText" style="font-size:15px;font-weight:800;text-align:right">Locating…</div></div>
-      <div id="trackmap" style="height:210px;border-radius:16px;overflow:hidden;margin-bottom:14px;border:1px solid var(--line);background:#eef2f8"></div>`;
+      <div id="trackmap" style="height:210px;border-radius:16px;overflow:hidden;margin-bottom:14px;border:1px solid var(--line);background:#0B1F45"></div>`;
   } else if(d.status==='delivered'){
     h+=`<div class="map"><div class="path"></div><span class="pin pinA">📍</span><span class="truck">✅</span><span class="pin pinB">🏁</span></div>`;
   } else if(d.status==='cancelled'){
-    h+=`<div class="card" style="text-align:center;padding:26px 18px;background:#fef2f2;border-color:#fecaca">
-        <div style="font-size:34px">🚫</div><b style="color:var(--red)">Delivery cancelled</b>
+    h+=`<div class="card" style="text-align:center;padding:26px 18px;background:rgba(248,113,113,.10);border-color:rgba(248,113,113,.45)">
+        <div style="color:var(--red)">${ic('x',34)}</div><b style="color:var(--red)">Delivery cancelled</b>
         <p class="sub" style="margin:6px 0 0">This delivery was cancelled and is no longer active.</p></div>`;
   } else {
     h+=`<div class="card" style="text-align:center;padding:26px 18px">
-        <div style="font-size:34px">🔎</div><b>Finding a nearby captain…</b>
+        <div style="color:var(--brand)">${ic('clock',34)}</div><b>Finding a nearby captain…</b>
         <p class="sub" style="margin:6px 0 0">Live tracking starts as soon as a captain accepts your delivery.</p></div>`;
   }
   h+=`<div class="card">${routeMini(d)}
@@ -1209,7 +1297,7 @@ function custTrack(){
       <div><b>${esc(d.driver.name)}</b><div style="font-size:12px;color:var(--muted)">
         ${esc(d.driver.vehicle)} · ${esc(d.driver.plate)}</div></div></div>
       ${d.driver.mobile?`<div style="margin-top:11px">
-        <a class="btn ghost sm" href="${telHref(d.driver.mobile)}" style="display:block;text-align:center;text-decoration:none;padding:11px">📞 Call captain</a>
+        <a class="btn ghost sm" href="${telHref(d.driver.mobile)}" style="display:block;text-align:center;text-decoration:none;padding:11px">${ic('phone',16)} Call captain</a>
       </div>`:''}</div>`;}
   if(d.status==='pending'||d.status==='assigned'){
     h+=`<button class="btn danger" onclick="cancelDelivery(${d.id})">Cancel delivery</button>
@@ -1314,7 +1402,7 @@ function driverJobs(){
       <div style="font-size:12px;opacity:.85;margin-top:4px">Tap to continue — finish it before claiming another</div></div>`;
   if(!driver.loc){
     return h+`<div class="card" style="border-color:var(--brand);text-align:center;padding:26px 18px">
-      <div style="font-size:34px">📍</div>
+      <div style="color:var(--brand)">${ic('gps',34)}</div>
       <b style="font-size:16px">Enable your location</b>
       <p class="sub" style="margin:6px 0 14px">Turn on location to find the delivery jobs closest to you.</p>
       <button class="btn" onclick="enableCaptainLocation()">Enable location</button></div>`;
@@ -1350,15 +1438,15 @@ function driverJob(){
     <div class="card"><small style="color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase">Pickup</small>
       <div style="font-weight:600;margin:2px 0 9px">${esc(d.from)}</div>
       <a class="btn ghost sm" href="${navUrl(d.pickCoords||d.from)}" target="_blank" rel="noopener"
-        style="display:block;text-align:center;text-decoration:none;padding:10px">🧭 Navigate to pickup</a></div>`;
+        style="display:block;text-align:center;text-decoration:none;padding:10px">${ic('nav',16)} Navigate to pickup</a></div>`;
   const picked=(d.status==='transit'||d.status==='delivered');
   if(mine){
     const cod=(d.paymentMethod||'cod')==='cod';
     if(d.customerMobile){
       h+=`<div class="card"><small style="color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase">Contact pickup customer</small>
         <div style="display:flex;gap:8px;margin-top:9px">
-          <a class="btn ghost sm" href="${telHref(d.customerMobile)}" style="flex:1;text-align:center;text-decoration:none;padding:11px">📞 Call</a>
-          <a class="btn sm" href="${waHref(d.customerMobile)}" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none;padding:11px;background:#25D366">💬 WhatsApp</a>
+          <a class="btn ghost sm" href="${telHref(d.customerMobile)}" style="flex:1;text-align:center;text-decoration:none;padding:11px">${ic('phone',15)} Call</a>
+          <a class="btn sm" href="${waHref(d.customerMobile)}" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none;padding:11px;background:#25D366;color:#052A1A">${ic('chat',15)} WhatsApp</a>
         </div></div>`;
     }
     h+=`<div class="card" style="display:flex;align-items:center;justify-content:space-between">
@@ -1370,8 +1458,8 @@ function driverJob(){
         <b>${n>1?(i+1)+'. ':''}${esc(b.recipient)}</b>
         <a href="${navUrl(b.addr)}" target="_blank" rel="noopener" style="display:block;font-size:13px;color:var(--brand);font-weight:600;margin-top:2px;text-decoration:none">🧭 ${esc(b.addr)}</a>
         ${picked?`<div style="display:flex;gap:8px;margin-top:6px">
-          <a class="btn ghost sm" href="${telHref(b.mobile)}" style="flex:1;text-align:center;text-decoration:none;padding:9px">📞 Call</a>
-          <a class="btn sm" href="${waHref(b.mobile)}" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none;padding:9px;background:#25D366">💬 WhatsApp</a>
+          <a class="btn ghost sm" href="${telHref(b.mobile)}" style="flex:1;text-align:center;text-decoration:none;padding:9px">${ic('phone',15)} Call</a>
+          <a class="btn sm" href="${waHref(b.mobile)}" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none;padding:9px;background:#25D366;color:#052A1A">${ic('chat',15)} WhatsApp</a>
         </div>`:''}</div>`).join('')}
       ${picked&&d.notes?`<div style="margin-top:8px;font-size:13px;color:var(--muted)">📝 ${esc(d.notes)}</div>`:''}</div>`;
   if(!mine&&d.status==='pending'){
@@ -1387,7 +1475,7 @@ function driverJob(){
   }
   else if(d.status==='transit'){
     h+=`<a class="btn" href="${navUrl((d.bags[0]||{}).addr||d.toCity)}" target="_blank" rel="noopener"
-        style="display:block;text-align:center;text-decoration:none">🧭 Navigate to drop-off</a>
+        style="display:block;text-align:center;text-decoration:none">${ic('nav',16)} Navigate to drop-off</a>
       <div style="height:10px"></div>`;
     if((d.paymentMethod||'cod')==='cod')h+=`<div class="card" style="text-align:center;background:var(--amber-soft);border-color:var(--amber);color:var(--amber);font-weight:700;font-size:13px">💵 Collect ${money(d.price,d.currency)} cash from the recipient</div>`;
     h+=`<button class="btn green" onclick="advance(${d.id})">Mark as delivered ✓</button>`;
@@ -1395,7 +1483,7 @@ function driverJob(){
   else if(d.status==='delivered'){
     const cod=(d.paymentMethod||'cod')==='cod', comm=round2(d.price*COMMISSION), net=round2(d.price-comm);
     h+=`<div class="card" style="text-align:center;background:var(--green-soft);border-color:var(--green)">
-      <b style="color:var(--green)">✓ Delivered</b>
+      <b style="color:var(--green)">${ic('check',15)} Delivered</b>
       <div style="font-size:13px;color:var(--muted);margin-top:3px">You earned ${jod(net)}${cod?` · you owe Droply ${jod(comm)}`:''}</div></div>`;
   }
   return h;
@@ -1538,8 +1626,8 @@ function profile(){
     <div class="card" style="display:flex;align-items:center;justify-content:space-between">
       <b style="font-size:14px">Language</b>
       <div style="display:flex;gap:6px">
-        <button onclick="setLang('en')" style="background:${lang==='en'?'var(--brand)':'#fff'};color:${lang==='en'?'#fff':'var(--ink)'};border:1.5px solid var(--line);border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer">English</button>
-        <button onclick="setLang('ar')" style="background:${lang==='ar'?'var(--brand)':'#fff'};color:${lang==='ar'?'#fff':'var(--ink)'};border:1.5px solid var(--line);border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer">العربية</button>
+        <button onclick="setLang('en')" style="background:${lang==='en'?'var(--brand)':'transparent'};color:${lang==='en'?'#052A3A':'var(--ink)'};border:1.5px solid var(--line);border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer">English</button>
+        <button onclick="setLang('ar')" style="background:${lang==='ar'?'var(--brand)':'transparent'};color:${lang==='ar'?'#052A3A':'var(--ink)'};border:1.5px solid var(--line);border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer">العربية</button>
       </div></div>
     <button class="btn ghost" onclick="screen='settings';render()">✎ Edit profile</button>
     <div style="height:10px"></div>
@@ -1589,11 +1677,11 @@ function emptyState(em,t,s){return `<div class="empty"><span class="e-em">${em}<
 function renderNav(){
   const n=$('nav');
   const nav = role==='customer'
-    ? [['home','🏠','Home'],['new','＋','Send'],['profile','🙂','Profile']]
-    : [['home','🧾','Jobs'],['trips','🚚','My trips'],['earn','💰','Earnings'],['profile','🙂','Profile']];
+    ? [['home','home','Home'],['orders','orders','Orders'],['profile','profile','Profile']]
+    : [['home','jobs','Jobs'],['trips','truck','My trips'],['earn','wallet','Earnings'],['profile','profile','Profile']];
   n.style.display='flex';
   n.innerHTML=nav.map(([t,i,l])=>
-    `<a class="${tab===t&&screen==='main'?'on':''}" onclick="go('${t}')"><span class="ni">${i}</span>${l}</a>`).join('');
+    `<a class="${tab===t&&screen==='main'?'on':''}" onclick="go('${t}')"><span class="ni">${ic(i,22)}</span>${l}</a>`).join('');
 }
 
 /* ---- tag iOS installed PWA so we can guarantee bottom-nav clearance ---- */
