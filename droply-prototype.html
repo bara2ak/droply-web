@@ -356,13 +356,20 @@ let docs={id:null,license:null,record:null};  // uploaded document filenames
 let verifyEmail=null;    // captain awaiting verification
 let settleDraft={amount:'',proof:null,ref:''};  // captain transfer submission
 
-function mapCustomer(p){return {id:p.id,name:p.full_name,email:p.email,mobile:p.mobile,city:p.city,photo:p.photo_url};}
-function mapCaptain(p,c){return {id:p.id,name:p.full_name,email:p.email,mobile:p.mobile,city:p.city,photo:p.photo_url,
+function mapCustomer(p){return {id:p.id,name:p.full_name,email:p.email,mobile:p.mobile,city:p.city,country:p.country||'JO',photo:p.photo_url};}
+function mapCaptain(p,c){return {id:p.id,name:p.full_name,email:p.email,mobile:p.mobile,city:p.city,country:p.country||'JO',photo:p.photo_url,
   vehicle:c?c.vehicle:'Car',plate:c?c.plate:null,verified:c?c.status==='verified':false,
   status:c?c.status:'pending',earnings:c?Number(c.earnings||0):0,owed:c?Number(c.owed||0):0,pendingTransfers:[]};}
 
 const SIZES={ small:{label:'Small',em:'📦',scale:15}, medium:{label:'Medium',em:'📦',scale:30} };
 const JO_CITIES=['Amman','Zarqa','Irbid','Russeifa','Aqaba','Salt','Madaba','Mafraq','Jerash','Ajloun','Karak',"Ma'an",'Tafilah','Ramtha'];
+const SA_CITIES=['Riyadh','Jeddah','Mecca','Medina','Dammam','Khobar','Dhahran','Taif','Tabuk','Buraidah','Abha','Khamis Mushait','Hail','Najran','Jubail','Yanbu','Hofuf','Jazan'];
+const COUNTRIES={
+  JO:{name:'Jordan',flag:'🇯🇴',dial:'962',cities:JO_CITIES,ph:'07 9000 0000'},
+  SA:{name:'Saudi Arabia',flag:'🇸🇦',dial:'966',cities:SA_CITIES,ph:'05 0000 0000'},
+};
+function citiesFor(code){ return (COUNTRIES[code]||COUNTRIES.JO).cities; }
+function countryOfUser(){ const u=currentUser(); return (u&&u.country)||'JO'; }
 const PRICE_SAME=3, PRICE_CROSS=6;   // JOD
 const COMMISSION=0.5;                 // Droply's cut of each delivery fee (50%)
 function priceFor(fromCity,toCity){ return fromCity===toCity?PRICE_SAME:PRICE_CROSS; }
@@ -388,16 +395,25 @@ function mapDelivery(r){
     bags:(r.delivery_bags||[]).slice().sort((a,b)=>(a.seq||0)-(b.seq||0)).map(b=>({recipient:b.recipient,addr:b.address,mobile:b.mobile})) };
 }
 const DELSEL='*, delivery_bags(*), customer:profiles(full_name,mobile), captains(vehicle,plate,profiles(full_name,mobile))';
-// Normalise any Jordan number to full international digits (962XXXXXXXXX)
-function normJo(m){
+// Normalise a number to full international digits, for a given country code
+function normPhone(m,cc){
+  const dial=(COUNTRIES[cc]||COUNTRIES.JO).dial;
   let d=String(m||'').replace(/\D/g,'');
-  if(d.startsWith('00')) d=d.slice(2);       // 00962… -> 962…
-  if(d.startsWith('962')) return d;          // already has country code
-  if(d.startsWith('0')) return '962'+d.slice(1); // 07… -> 9627…
-  return '962'+d;                            // 7… -> 9627…
+  if(d.startsWith('00')) d=d.slice(2);
+  for(const k in COUNTRIES){ if(d.startsWith(COUNTRIES[k].dial)) return d; }  // already international
+  if(d.startsWith('0')) return dial+d.slice(1);
+  return dial+d;
 }
-function telHref(m){return 'tel:+'+normJo(m);}
-function waHref(m){return 'https://wa.me/'+normJo(m);}
+// for stored numbers that already carry their country code
+function normIntl(m){
+  let d=String(m||'').replace(/\D/g,'');
+  if(d.startsWith('00')) d=d.slice(2);
+  for(const k in COUNTRIES){ if(d.startsWith(COUNTRIES[k].dial)) return d; }
+  if(d.startsWith('0')) return '962'+d.slice(1);   // legacy Jordan numbers
+  return '962'+d;
+}
+function telHref(m){return 'tel:+'+normIntl(m);}
+function waHref(m){return 'https://wa.me/'+normIntl(m);}
 async function loadDeliveries(){
   try{
     let rows=[];
@@ -492,6 +508,7 @@ const AR = {
   "Customer":"عميل","Captain":"كابتن","Back":"رجوع","‹ Back":"‹ رجوع","All deliveries":"كل الطلبات",
   "Your account has been suspended. Please contact support.":"تم إيقاف حسابك. يرجى التواصل مع الدعم.",
   "Enter your phone number":"أدخل رقم جوالك","Continue":"متابعة","Change":"تغيير",
+  "Country":"الدولة","Jordan":"الأردن","Saudi Arabia":"السعودية",
   "We'll check if you already have an account.":"سنتحقق إن كان لديك حساب بالفعل.",
   "Choose a password":"اختر كلمة مرور","Checking…":"جارٍ التحقق…","Wrong password":"كلمة المرور غير صحيحة",
   "Enter a valid mobile number":"أدخل رقم جوال صحيح","Enter your password":"أدخل كلمة المرور",
@@ -690,10 +707,11 @@ function enterApp(){ tab='home'; screen='main'; resetDocs(); show('app'); render
 
 /* ---- phone-first auth: one page. Enter phone → log in, or register. ---- */
 let authStep='phone';      // 'phone' | 'login' | 'signup'
-let authPhone='';          // normalised 962…
+let authPhone='';          // normalised international digits
 let authEmail='';          // login email resolved from the phone
-function phoneEmail(p){ return normJo(p)+'@droply.app'; }   // synthetic login for new accounts
-function prettyPhone(p){ return '+'+normJo(p); }
+let authCountry='JO';      // selected country for the phone number
+function phoneEmail(p){ return normIntl(p)+'@droply.app'; }   // synthetic login for new accounts
+function prettyPhone(p){ return '+'+normIntl(p); }
 
 function renderAuth(){
   const v=$('authView');
@@ -705,9 +723,17 @@ function renderAuth(){
     <p class="sub">${isDriver?'Captain account':'Customer account'} · Droply</p>`;
 
   if(authStep==='phone'){
+    const C=COUNTRIES[authCountry];
     v.innerHTML=head+`
+      <label>Country</label>
+      <select id="a_country" onchange="authCountry=this.value;renderAuth()">
+        ${Object.entries(COUNTRIES).map(([k,c])=>`<option value="${k}" ${authCountry===k?'selected':''}>${c.flag} ${c.name} (+${c.dial})</option>`).join('')}
+      </select>
       <label>Mobile number</label>
-      <input id="a_phone" type="tel" inputmode="numeric" placeholder="07 9000 0000" value="${esc(authPhone)}">
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="padding:13px 12px;border:1.5px solid var(--line);border-radius:12px;background:#fff;font-weight:700;white-space:nowrap">${C.flag} +${C.dial}</div>
+        <input id="a_phone" type="tel" inputmode="numeric" placeholder="${C.ph}" value="${esc(authPhone)}" style="flex:1">
+      </div>
       <p style="font-size:12px;color:var(--muted);margin:8px 0 0">We'll check if you already have an account.</p>
       <div style="height:18px"></div>
       <button class="btn" onclick="continuePhone()">Continue</button>`;
@@ -730,7 +756,7 @@ function renderAuth(){
       <b>${esc(prettyPhone(authPhone))}</b>
       <a onclick="authStep='phone';renderAuth()" style="color:var(--brand);font-weight:700;cursor:pointer;font-size:13px">Change</a></div>
     <label>Full name</label><input id="a_name" placeholder="Your name">
-    <label>City</label><select id="a_city">${JO_CITIES.map(c=>`<option>${c}</option>`).join('')}</select>
+    <label>City</label><select id="a_city">${citiesFor(authCountry).map(c=>`<option>${c}</option>`).join('')}</select>
     <label>Password</label><input id="a_pass" type="password" placeholder="Choose a password">
     <div style="height:18px"></div>
     <button class="btn" onclick="submitAuth()">Create account</button>`;
@@ -739,7 +765,7 @@ function renderAuth(){
 async function continuePhone(){
   const raw=($('a_phone').value||'').trim();
   if(raw.replace(/\D/g,'').length<7){toast('Enter a valid mobile number');return;}
-  authPhone=normJo(raw);
+  authPhone=normPhone(raw,authCountry);
   toast('Checking…');
   try{
     const {data}=await sb.rpc('phone_lookup',{p_phone:authPhone});
@@ -767,7 +793,7 @@ function driverSignupForm(){
     <label>Password</label><input id="a_pass" type="password" placeholder="Choose a password">
     <label>City</label>
     <select id="a_city"><option value="" disabled selected>Select your city</option>
-      ${JO_CITIES.map(c=>`<option>${c}</option>`).join('')}</select>
+      ${citiesFor(authCountry).map(c=>`<option>${c}</option>`).join('')}</select>
     <label>Vehicle</label>
     <select id="a_veh"><option selected>Car</option><option>Motorcycle</option></select>
     <label>License plate</label><input id="a_plate" placeholder="e.g. ABC-1234">
@@ -840,7 +866,7 @@ async function submitAuth(){
       const {data,error}=await sb.auth.signUp({email:authEmail,password:pass});
       if(error){toast(error.message);return;}
       const uid=data.user.id;
-      await sb.from('profiles').insert({id:uid,role:'captain',full_name:first+' '+last,email:authEmail,mobile,city});
+      await sb.from('profiles').insert({id:uid,role:'captain',full_name:first+' '+last,email:authEmail,mobile,city,country:authCountry});
       await sb.from('captains').insert({id:uid,vehicle:$('a_veh').value,plate:($('a_plate').value||'').trim()||null,
         status:'pending'});
       const paths=await uploadKyc(uid);
@@ -857,7 +883,7 @@ async function submitAuth(){
       toast('Creating your account…');
       const {data,error}=await sb.auth.signUp({email:authEmail,password:pass});
       if(error){toast(error.message);return;}
-      await sb.from('profiles').insert({id:data.user.id,role:'customer',full_name:name,email:authEmail,mobile,city});
+      await sb.from('profiles').insert({id:data.user.id,role:'customer',full_name:name,email:authEmail,mobile,city,country:authCountry});
       await loadProfileAndRoute();
       toast('Welcome to Droply, '+name.split(' ')[0]+'!');
     }
@@ -993,7 +1019,7 @@ function applyCode(){
   else{draft.discountObj=disc;toast(disc.code+' applied — '+discLabel(disc));}
   render();
 }
-function cityOpts(sel){return JO_CITIES.map(c=>`<option ${sel===c?'selected':''}>${c}</option>`).join('');}
+function cityOpts(sel){return citiesFor(countryOfUser()).map(c=>`<option ${sel===c?'selected':''}>${c}</option>`).join('');}
 function custCreate(){
   const perBag=priceFor(draft.fromCity,draft.toCity);
   const qty=draft.bags.length;
@@ -1468,11 +1494,11 @@ function editProfile(){
   const u=currentUser();
   const driverFields = role==='driver'?`
     <label>Mobile number</label><input id="p_mobile" value="${esc(u.mobile||'')}">
-    <label>City</label><select id="p_city">${JO_CITIES.map(c=>`<option ${u.city===c?'selected':''}>${c}</option>`).join('')}</select>
+    <label>City</label><select id="p_city">${citiesFor(countryOfUser()).map(c=>`<option ${u.city===c?'selected':''}>${c}</option>`).join('')}</select>
     <label>Vehicle</label><select id="p_veh"><option ${u.vehicle==='Car'?'selected':''}>Car</option><option ${u.vehicle==='Motorcycle'?'selected':''}>Motorcycle</option></select>
     <label>License plate</label><input id="p_plate" value="${esc(u.plate||'')}">`
   :`<label>Mobile number</label><input id="p_mobile" value="${esc(u.mobile||'')}">
-    <label>City</label><select id="p_city">${JO_CITIES.map(c=>`<option ${u.city===c?'selected':''}>${c}</option>`).join('')}</select>`;
+    <label>City</label><select id="p_city">${citiesFor(countryOfUser()).map(c=>`<option ${u.city===c?'selected':''}>${c}</option>`).join('')}</select>`;
   return `<button class="back" onclick="screen='main';render()">‹ Back</button>
     <h1>Edit profile</h1><p class="sub">Update your details</p>
     <div style="text-align:center;margin-bottom:6px">${pfpEl(u,true)}

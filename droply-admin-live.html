@@ -108,7 +108,10 @@ function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');cle
 
 let route='dashboard';
 let captains=[], customers=[], discounts=[], settlements=[], deliveries=[], staff=[], payouts=[];
-const CITIES=['Amman','Zarqa','Irbid','Russeifa','Aqaba','Salt','Madaba','Mafraq','Jerash','Ajloun','Karak',"Ma'an",'Tafilah','Ramtha'];
+const JO_CITIES=['Amman','Zarqa','Irbid','Russeifa','Aqaba','Salt','Madaba','Mafraq','Jerash','Ajloun','Karak',"Ma'an",'Tafilah','Ramtha'];
+const SA_CITIES=['Riyadh','Jeddah','Mecca','Medina','Dammam','Khobar','Dhahran','Taif','Tabuk','Buraidah','Abha','Khamis Mushait','Hail','Najran','Jubail','Yanbu','Hofuf','Jazan'];
+const CITIES=[...JO_CITIES,...SA_CITIES];
+const COUNTRY_NAMES={JO:'🇯🇴 Jordan',SA:'🇸🇦 Saudi Arabia'};
 const STAFF_ROLES={super_admin:'Super Admin',manager:'Manager',dispatcher:'Dispatcher',support:'Support',finance:'Finance'};
 
 /* ---------- AUTH ---------- */
@@ -148,7 +151,7 @@ async function loadAll(){
   ]);
   captains=(cap.data||[]).map(c=>({id:c.id, name:c.profiles?.full_name||'—', email:c.profiles?.email||'',
     mobile:c.profiles?.mobile||'', city:c.profiles?.city||'', vehicle:c.vehicle, plate:c.plate,
-    status:c.status, owed:Number(c.owed||0), earnings:Number(c.earnings||0),
+    status:c.status, owed:Number(c.owed||0), earnings:Number(c.earnings||0), country:c.profiles?.country||'JO',
     joined:c.profiles?.created_at||c.created_at,
     docs:{id:c.id_doc_url,license:c.license_url,record:c.record_url}}));
   customers=(cus.data||[]);
@@ -228,7 +231,7 @@ function renderKeepFocus(id){
 function capPill(s){return `<span class="pill p-${s}">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`;}
 function viewCaptains(){
   const list=captains.filter(c=>
-    matches(fCapQ,c.name,c.email,c.mobile,c.plate,c.vehicle,c.city) &&
+    matches(fCapQ,c.name,c.email,c.mobile,c.plate,c.vehicle,c.city,COUNTRY_NAMES[c.country]||'') &&
     (fCapStatus==='all'||c.status===fCapStatus) &&
     (fCapCity==='all'||c.city===fCapCity));
   const bar=toolbar({q:fCapQ,qId:'cap_q',qVar:'fCapQ',ph:'Search name, phone, email, plate…',
@@ -237,7 +240,7 @@ function viewCaptains(){
     clear:"fCapQ='';fCapStatus='all';fCapCity='all'",count:`${list.length} of ${captains.length}`});
   const rows=list.map(c=>`<tr>
     <td><div class="u"><div class="nm">${esc(c.name)}</div><div class="em">${esc(c.email)}</div></div></td>
-    <td>${esc(c.mobile)}</td><td>${esc(c.city)}</td><td>${esc(c.vehicle)} · ${esc(c.plate||'—')}</td>
+    <td>${esc(c.mobile)}</td><td>${COUNTRY_NAMES[c.country]||c.country}</td><td>${esc(c.city)}</td><td>${esc(c.vehicle)} · ${esc(c.plate||'—')}</td>
     <td>${capPill(c.status)}</td><td>${c.owed>0?`<b style="color:var(--amber)">${jod(c.owed)}</b>`:'—'}</td>
     <td>
       ${c.status==='pending'?`<button class="mini g" onclick="setCaptain('${c.id}','verified')">Approve</button><button class="mini r" onclick="setCaptain('${c.id}','suspended')">Reject</button>`:''}
@@ -246,11 +249,11 @@ function viewCaptains(){
       <button class="mini b" onclick="viewCaptain('${c.id}')">View</button>
       <button class="mini b" onclick="openCaptain('${c.id}')">Edit</button>
       <button class="mini r" onclick="deleteUser('${c.id}','${esc(c.name)}','captain')">Delete</button>
-    </td></tr>`).join('') || `<tr><td class="empty" colspan="7">No captains match your search.</td></tr>`;
+    </td></tr>`).join('') || `<tr><td class="empty" colspan="8">No captains match your search.</td></tr>`;
   return `<div class="head"><div><h1>Captains</h1><div class="sub">${captains.length} registered · ${captains.filter(c=>c.status==='pending').length} awaiting approval</div></div>
     <div style="display:flex;gap:8px"><button class="btn sm outline" onclick="reload()">↻ Refresh</button><button class="btn sm" onclick="openNewCaptain()">＋ Add captain</button></div></div>
     ${bar}
-    <div class="panel"><table><thead><tr><th>Captain</th><th>Mobile</th><th>City</th><th>Vehicle</th><th>Status</th><th>Owed</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="panel"><table><thead><tr><th>Captain</th><th>Mobile</th><th>Country</th><th>City</th><th>Vehicle</th><th>Status</th><th>Owed</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 async function setCaptain(id,status){
   const {error}=await sb.from('captains').update({status}).eq('id',id);
@@ -261,7 +264,7 @@ async function setCaptain(id,status){
 /* ---------- CUSTOMERS ---------- */
 function viewCustomers(){
   const list=customers.filter(c=>
-    matches(fCusQ,c.full_name,c.email,c.mobile,c.city) &&
+    matches(fCusQ,c.full_name,c.email,c.mobile,c.city,COUNTRY_NAMES[c.country||'JO']||'') &&
     (fCusStatus==='all'||(fCusStatus==='suspended'?c.suspended:!c.suspended)) &&
     (fCusCity==='all'||c.city===fCusCity));
   const bar=toolbar({q:fCusQ,qId:'cus_q',qVar:'fCusQ',ph:'Search name, phone, email…',
@@ -270,7 +273,7 @@ function viewCustomers(){
     clear:"fCusQ='';fCusStatus='all';fCusCity='all'",count:`${list.length} of ${customers.length}`});
   const rows=list.map(c=>`<tr>
     <td><div class="u"><div class="nm">${esc(c.full_name)}</div><div class="em">${esc(c.email)}</div></div></td>
-    <td>${esc(c.mobile||'—')}</td><td>${esc(c.city||'—')}</td>
+    <td>${esc(c.mobile||'—')}</td><td>${COUNTRY_NAMES[c.country||'JO']||''}</td><td>${esc(c.city||'—')}</td>
     <td>${c.suspended?'<span class="pill p-suspended">Suspended</span>':'<span class="pill p-verified">Active</span>'}</td>
     <td>${new Date(c.created_at).toISOString().slice(0,10)}</td>
     <td>
@@ -278,11 +281,11 @@ function viewCustomers(){
       <button class="mini ${c.suspended?'g':'r'}" onclick="toggleCustomerSuspend('${c.id}',${!c.suspended})">${c.suspended?'Unsuspend':'Suspend'}</button>
       <button class="mini r" onclick="deleteUser('${c.id}','${esc(c.full_name)}','customer')">Delete</button>
     </td></tr>`).join('')
-    || `<tr><td class="empty" colspan="6">No customers match your search.</td></tr>`;
+    || `<tr><td class="empty" colspan="7">No customers match your search.</td></tr>`;
   return `<div class="head"><div><h1>Customers</h1><div class="sub">${customers.length} registered · ${customers.filter(c=>c.suspended).length} suspended</div></div>
     <button class="btn sm" onclick="reload()">↻ Refresh</button></div>
     ${bar}
-    <div class="panel"><table><thead><tr><th>Customer</th><th>Mobile</th><th>City</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="panel"><table><thead><tr><th>Customer</th><th>Mobile</th><th>Country</th><th>City</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ---------- DELIVERIES ---------- */
